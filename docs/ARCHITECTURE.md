@@ -109,10 +109,38 @@ role is the only writer.
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 1 | SQL schema, RLS, project scaffold | this commit |
-| 2 | Plaid utilities: token exchange, liabilities, transactions | pending approval |
-| 3 | Cash Flow Engine + avalanche/snowball algorithm | pending |
+| 1 | SQL schema, RLS, project scaffold | done |
+| 2 | Plaid utilities: token exchange, liabilities, transactions | done |
+| 3 | Cash Flow Engine + avalanche/snowball algorithm | pending approval |
 | 4 | Dashboard components | pending |
+
+## Phase 2 notes
+
+**Blended APR.** A card reporting 0% on a transferred balance and 24.99% on
+purchases cannot be ranked by either number alone. `effectiveApr()` computes the
+balance-weighted blend, `Σ(apr × balance) / Σ(balance)`, which is what the card
+actually costs to carry. Where issuers omit `balance_subject_to_apr` it falls
+back to a single rate by priority, preferring purchase APR. Stored `apr_type`
+records which path ran (`blended` vs. the Plaid apr_type), so the UI can explain
+the ranking. Open item for Phase 4: a blended rate understates a promo card in
+the week its 0% period ends — surface promo expiry rather than let the blend
+bury it.
+
+**Cursor safety.** `/transactions/sync` writes its cursor only after the rows
+land. Advancing it first means a failed insert skips those transactions
+permanently and silently. Mid-pagination mutations
+(`TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION`) discard the accumulated batch
+and restart from the original cursor.
+
+**Transfers excluded from spend.** `LOAN_PAYMENTS`, `TRANSFER_IN`, and
+`TRANSFER_OUT` are flagged `is_transfer`. Counting a $600 card payment as a
+living expense would shrink next week's recommendation by $600 — the engine
+would punish the user for following its own advice.
+
+**Webhook verification.** The endpoint is a public URL that triggers bank syncs,
+so every request is verified: ES256 JWT against Plaid's published key, plus a
+SHA-256 match on the exact raw body, plus an `iat` freshness bound. Parse JSON
+only after that passes.
 
 ## Setup
 
