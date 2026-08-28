@@ -1,87 +1,35 @@
 @import "tailwindcss";
 
-/**
- * Design tokens.
- *
- * Light values live on bare :root; dark redefines only the same names, under
- * both the OS media query and an explicit data-theme stamp so a toggle can win
- * in either direction. Nothing gets its only definition inside a dark block.
- *
- * The series slots are the validated categorical palette, in fixed order.
- * Assigned by identity, never by rank — a bucket keeps its hue when the others
- * change size. Validated with the six checks in both modes: worst adjacent CVD
- * ΔE 9.1 light / 8.4 dark, worst normal-vision ΔE 19.6 / 19.3.
- */
 :root {
-  color-scheme: light;
-
-  --surface-page: #f9f9f7;
-  --surface-1: #fcfcfb;
-  --surface-2: #f2f1ee;
-
-  --ink-primary: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
-  --hairline: #e1e0d9;
-
-  /* Cash allocation buckets, in fixed slot order. */
-  --series-1: #2a78d6; /* strike */
-  --series-2: #eb6834; /* fixed bills */
-  --series-3: #1baf7a; /* variable budget */
-  --series-4: #eda100; /* minimums */
-  --series-5: #e87ba4; /* cash floor */
-
-  /* Status — reserved, never reused as a series colour. */
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-
-    --surface-page: #0d0d0d;
-    --surface-1: #1a1a19;
-    --surface-2: #242422;
-
-    --ink-primary: #ffffff;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
-    --hairline: #2c2c2a;
-
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-  }
-}
-
-:root[data-theme="dark"] {
   color-scheme: dark;
-
-  --surface-page: #0d0d0d;
-  --surface-1: #1a1a19;
-  --surface-2: #242422;
+  --surface-page: #090a0f;
+  --surface-1: #11131a;
+  --surface-2: #1a1d27;
+  --surface-3: #222634;
 
   --ink-primary: #ffffff;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
-  --hairline: #2c2c2a;
+  --ink-secondary: #94a3b8;
+  --ink-muted: #64748b;
+  --hairline: rgba(255, 255, 255, 0.08);
 
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
+  /* Series Colors */
+  --series-1: #3b82f6; /* Strike */
+  --series-2: #f97316; /* Bills */
+  --series-3: #10b981; /* Variable */
+  --series-4: #f59e0b; /* Minimums */
+  --series-5: #ec4899; /* Floor */
+
+  /* Status */
+  --status-good: #22c55e;
+  --status-warning: #eab308;
+  --status-critical: #ef4444;
 }
 
 @theme inline {
   --color-page: var(--surface-page);
   --color-surface: var(--surface-1);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-ink: var(--ink-primary);
   --color-ink-secondary: var(--ink-secondary);
   --color-ink-muted: var(--ink-muted);
@@ -95,18 +43,26 @@
 
   --color-good: var(--status-good);
   --color-warning: var(--status-warning);
-  --color-serious: var(--status-serious);
   --color-critical: var(--status-critical);
 }
 
-body {
-  background: var(--surface-page);
-  color: var(--ink-primary);
-  -webkit-font-smoothing: antialiased;
+/* Hide scrollbar across all browsers */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
-/* Columns of figures align; standalone display numbers use proportional
-   figures, where tabular-nums makes a value like 121 look loose. */
+body {
+  background-color: var(--surface-page);
+  color: var(--ink-primary);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
