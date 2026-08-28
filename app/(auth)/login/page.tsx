@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Button, Card, Field, Input } from "@/components/ui";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
@@ -17,20 +15,36 @@ export default function LoginPage() {
     setStatus("sending");
     setMessage("");
 
-    const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = createBrowserSupabaseClient();
+      console.log("Submitting login to Supabase...");
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (error) {
+      if (error) {
+        console.error("Auth error:", error);
+        setStatus("error");
+        setMessage(error.message);
+        alert("Login Error: " + error.message);
+        return;
+      }
+
+      if (data?.session) {
+        console.log("Session obtained, redirecting...");
+        window.location.href = "/dashboard";
+      } else {
+        alert("No session returned from Supabase.");
+        setStatus("idle");
+      }
+    } catch (err: any) {
+      console.error("Unexpected error:", err);
       setStatus("error");
-      setMessage(error.message);
-      return;
+      setMessage(err.message || "Failed to reach auth server");
+      alert("Network / Execution Error: " + (err.message || String(err)));
     }
-
-    window.location.href = "/dashboard";
-
   }
 
   return (
