@@ -1,0 +1,25 @@
+# Debt Destroyer — scheduled sync + recompute
+#
+# Replaces Vercel Cron when self-hosting. Paired with
+# debt-destroyer-refresh.timer.
+#
+# Install:
+#   sudo cp deploy/debt-destroyer-refresh.* /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now debt-destroyer-refresh.timer
+
+[Unit]
+Description=Debt Destroyer scheduled refresh
+After=debt-destroyer.service
+Requires=debt-destroyer.service
+
+[Service]
+Type=oneshot
+# CRON_SECRET must match the value in .env.local. The route checks it in
+# constant time and returns 503 rather than running unauthenticated if it is
+# unset, so a missing secret fails loudly instead of leaving the endpoint open.
+EnvironmentFile=/opt/debt-destroyer/.env.local
+ExecStart=/usr/bin/curl --fail --silent --show-error \
+  --max-time 600 \
+  --header "Authorization: Bearer ${CRON_SECRET}" \
+  http://127.0.0.1:3000/api/cron/weekly-refresh

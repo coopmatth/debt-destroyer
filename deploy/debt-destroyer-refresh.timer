@@ -1,0 +1,17 @@
+# Runs the sync + recompute every morning.
+#
+# Daily rather than weekly: the strike is recomputed live whenever you open the
+# dashboard, but balances only change when Plaid is polled. A daily sync keeps
+# the number honest without burning API calls.
+
+[Unit]
+Description=Debt Destroyer daily refresh
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+# Catch up after the machine has been asleep or powered off.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
