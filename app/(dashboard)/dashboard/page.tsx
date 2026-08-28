@@ -7,6 +7,7 @@ import { AllocationBar } from "@/components/dashboard/AllocationBar";
 import { Ledger } from "@/components/dashboard/Ledger";
 import { DebtRanking } from "@/components/dashboard/DebtRanking";
 import { ActionList, Blockers } from "@/components/dashboard/Alerts";
+import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
 import { Card, CardTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -16,18 +17,6 @@ export default async function DashboardPage() {
   if (!userId) redirect("/login");
 
   const db = createAdminClient();
-
-  /**
-   * Computed on the server, not fetched over HTTP from our own API — one less
-   * round trip and no risk of the page and the route disagreeing.
-   *
-   * Viewing the dashboard also persists the week's strike. That is a write on a
-   * read, which is not free, but the alternative is worse: "I paid this" needs a
-   * strike row to attach to, so without this the button never appears until some
-   * scheduled job happens to have run. On a self-hosted box with no scheduler
-   * that is never. The upsert is idempotent per (user_id, week_start) and
-   * refuses to overwrite a strike already accepted or paid.
-   */
   const { plan } = await computeAndStoreWeeklyPlan(db, userId);
 
   const { data: strike } = await db
@@ -44,6 +33,8 @@ export default async function DashboardPage() {
         strikeId={strike?.id ?? null}
         status={strike?.status ?? null}
       />
+
+      <WeeklyCalendar plan={plan} />
 
       <Blockers plan={plan} />
 
