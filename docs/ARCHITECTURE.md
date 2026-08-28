@@ -9,12 +9,13 @@ debt-destroyer/
 │   ├── page.tsx                  Marketing / entry page
 │   ├── globals.css               Tailwind v4 entry + design tokens
 │   ├── (auth)/
-│   │   └── login/                Supabase auth (magic link / OAuth)
+│   │   └── login/                Magic-link sign in                      [Phase 4]
+│   ├── auth/callback/            Code exchange → session                 [Phase 4]
 │   ├── (dashboard)/
-│   │   ├── dashboard/            Weekly Strike, safe-to-spend breakdown   [Phase 4]
-│   │   ├── debts/                Avalanche/snowball ranking table         [Phase 4]
-│   │   ├── expenses/             Fixed expense CRUD + budget knobs        [Phase 4]
-│   │   └── settings/             Strategy toggle, payday, linked banks    [Phase 4]
+│   │   ├── dashboard/            Weekly Strike, allocation, ledger        [Phase 4]
+│   │   ├── debts/                Debt entry + payoff order                [Phase 4]
+│   │   ├── expenses/             Bill entry, mark paid                    [Phase 4]
+│   │   └── settings/             Strategy, budget, payday, linked banks   [Phase 4]
 │   └── api/
 │       ├── plaid/
 │       │   ├── create-link-token/       POST → link_token for Plaid Link  [Phase 2]
@@ -23,6 +24,7 @@ debt-destroyer/
 │       │   └── webhook/                 POST ← Plaid item/txn webhooks    [Phase 2]
 │       ├── debts/                        Manual debt CRUD (RLS-scoped)     [Phase 2]
 │       ├── expenses/                     Manual bill CRUD (RLS-scoped)     [Phase 2]
+│       ├── settings/                      PATCH the engine's knobs          [Phase 4]
 │       ├── engine/
 │       │   └── weekly-plan/             GET compute · POST persist        [Phase 3]
 │       ├── strikes/[id]/                PATCH accept/skip/paid            [Phase 3]
@@ -35,13 +37,15 @@ debt-destroyer/
 │   ├── supabase/      client.ts (browser), server.ts (RSC/route), admin.ts (service role)
 │   ├── engine/        dates.ts, cashflow.ts, strategy.ts, index.ts, loader.ts [Phase 3]
 │   └── crypto/        tokens.ts — AES-256-GCM encrypt/decrypt of access tokens [Phase 2]
-├── components/        ui/ (primitives), plaid/ (Link button), dashboard/ (cards)
+├── components/        ui/ · dashboard/ · debts/ · expenses/ · settings/ · plaid/
+├── middleware.ts      Session refresh + dashboard gate
 ├── supabase/migrations/
 │   ├── 0001_initial_schema.sql
 │   ├── 0002_rls_policies.sql
-│   └── 0003_manual_debt_tracking.sql
-├── types/             database.types.ts (generated), domain.ts
-├── tests/             engine unit tests                                   [Phase 3]
+│   ├── 0003_manual_debt_tracking.sql
+│   └── 0004_expense_payment_tracking.sql
+├── types/             database.types.ts (generated from the migrations)
+├── tests/             money · mappers · validation · crypto · engine
 └── vercel.json        Weekly cron + function duration overrides
 ```
 
@@ -123,7 +127,7 @@ INSERT/UPDATE policy, so the service role is the only writer.
 | 1 | SQL schema, RLS, project scaffold | done |
 | 2 | Plaid (balances + transactions), manual debt/bill entry | done |
 | 3 | Cash Flow Engine + avalanche/snowball algorithm | done |
-| 4 | Dashboard components | pending approval |
+| 4 | Dashboard components | done |
 
 ## Phase 2 notes
 
@@ -235,3 +239,40 @@ user would see the recommendation move for no visible reason.
 balance (clamped at zero), rolls `next_due_date` forward a cycle, and records
 the minimum as paid for the cycle just closed — so the weekly loop is two taps
 rather than retyping balances. It refuses to apply twice.
+
+## Phase 4 notes
+
+**One hero figure per view.** The weekly strike, at display size, in the same
+sans as everything else and with proportional figures — `tabular-nums` gives
+every digit the width of a zero, which makes a large number look loose. Tabular
+figures are reserved for columns that must align.
+
+**The allocation bar is a partition, not a ranking.** Liquid cash divides into
+strike, bills, spending money, minimums, and floor; the parts sum to the whole,
+which is what makes a stacked bar the honest form. Colour is assigned by bucket
+identity in fixed slot order and never moves — the strike stays slot 1 whether
+it is the largest slice or absent. Palette validated in both modes: worst
+adjacent CVD ΔE 9.1 light / 8.4 dark, worst normal-vision ΔE 19.6 / 19.3.
+
+**Relief for the light-mode contrast warning.** Three light slots sit below 3:1
+against the surface, so nothing depends on colour alone: every bucket is named
+with its exact amount in the legend, and the ledger repeats all of it as text.
+
+**The payoff bar encodes the ranking key.** APR under avalanche, balance under
+snowball, so bar length always descends with rank. Encoding anything else breaks
+that — balance while ranking by APR puts the target at the top with the shortest
+bar, and annual interest cost is no better, since it scales with balance and
+lets a large low-rate loan outrun a small high-rate card ranked above it. Yearly
+carrying cost still appears as text on each row.
+
+**Status colour never carries meaning alone.** Blockers and paid/overdue badges
+pair the colour with a glyph and a written label, which is the mitigation the
+status palette requires on a light surface.
+
+**The dashboard computes server-side.** The page calls the engine directly
+rather than fetching its own API over HTTP — one less round trip, and no way for
+the page and the route to disagree about the week's number.
+
+**Verified by rendering.** The dashboard was built with fixture data and
+screenshotted at 1280px light, 1280px dark, and 390px mobile: no horizontal
+overflow, no label collisions, and dark mode re-stepped rather than flipped.

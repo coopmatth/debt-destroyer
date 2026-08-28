@@ -64,6 +64,13 @@ export const updateExpenseSchema = z
     next_due_date: isoDate,
     is_essential: z.boolean(),
     is_active: z.boolean(),
+
+    /**
+     * The occurrence the user is confirming paid. The engine skips any
+     * occurrence on or before this date, which is what stops a bill paid on the
+     * 1st from being reserved for the rest of the month.
+     */
+    last_paid_date: isoDate.nullable(),
   })
   .partial()
   .refine((patch) => Object.keys(patch).length > 0, "No fields to update");
