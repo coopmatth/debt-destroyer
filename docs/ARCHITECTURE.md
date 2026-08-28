@@ -24,7 +24,8 @@ debt-destroyer/
 │       ├── debts/                        Manual debt CRUD (RLS-scoped)     [Phase 2]
 │       ├── expenses/                     Manual bill CRUD (RLS-scoped)     [Phase 2]
 │       ├── engine/
-│       │   └── weekly-plan/             GET  → compute + persist a strike [Phase 3]
+│       │   └── weekly-plan/             GET compute · POST persist        [Phase 3]
+│       ├── strikes/[id]/                PATCH accept/skip/paid            [Phase 3]
 │       └── cron/
 │           └── weekly-refresh/          Vercel Cron: sync all, recompute  [Phase 3]
 ├── lib/
@@ -32,7 +33,7 @@ debt-destroyer/
 │   ├── validation/    debts.ts, expenses.ts — zod schemas shared by API and forms
 │   ├── money.ts       cents ↔ dollars, currency formatting
 │   ├── supabase/      client.ts (browser), server.ts (RSC/route), admin.ts (service role)
-│   ├── engine/        cashflow.ts, strategy.ts, types.ts                  [Phase 3]
+│   ├── engine/        dates.ts, cashflow.ts, strategy.ts, index.ts, loader.ts [Phase 3]
 │   └── crypto/        tokens.ts — AES-256-GCM encrypt/decrypt of access tokens [Phase 2]
 ├── components/        ui/ (primitives), plaid/ (Link button), dashboard/ (cards)
 ├── supabase/migrations/
@@ -121,8 +122,8 @@ INSERT/UPDATE policy, so the service role is the only writer.
 |-------|-------|--------|
 | 1 | SQL schema, RLS, project scaffold | done |
 | 2 | Plaid (balances + transactions), manual debt/bill entry | done |
-| 3 | Cash Flow Engine + avalanche/snowball algorithm | pending approval |
-| 4 | Dashboard components | pending |
+| 3 | Cash Flow Engine + avalanche/snowball algorithm | done |
+| 4 | Dashboard components | pending approval |
 
 ## Phase 2 notes
 
@@ -178,3 +179,59 @@ npm run dev
 Plaid environments are **sandbox** and **production** — `development` was retired
 in 2024. Only the Transactions product is requested; debts and bills are entered
 by hand, so no Liabilities approval is needed.
+
+## Phase 3 notes
+
+**The clock is an argument.** `computeWeeklyPlan(input, { now })` — nothing in
+`lib/engine` calls `new Date()`. That is what turns "what does this recommend on
+the Friday before a Tuesday payday" into a test rather than a thought
+experiment, and it is why the engine is a pure function with the database work
+pushed out to `loader.ts`.
+
+**Dates are strings, and arithmetic is UTC.** Due dates and paydays are calendar
+facts, not instants. Doing this math on local `Date` objects means a bill due
+March 9 can become March 8 for a user whose timezone shifts for DST that
+weekend, and the engine reserves it a day early. `todayInTimezone` is the one
+place a real zone is consulted — for the user's own calendar date, so their week
+does not roll over at 5pm Sunday.
+
+**Multiple occurrences per window.** A weekly bill genuinely lands twice before
+a fortnightly payday. `occurrencesInWindow` returns every occurrence, because
+one-charge-per-bill would under-reserve exactly the users living closest to the
+line.
+
+**The seven-day grace window.** Hand-maintained due dates go stale: rent is paid
+on the 1st but `next_due_date` still reads the 1st. Reserving it for the rest of
+the month would make every recommendation too small, all month. Past the grace
+window a charge is dropped from the math and raised as a blocker instead, so it
+gets attention rather than silently skewing the number. `expenses.last_paid_date`
+(migration 0004) is the precise fix; the grace window bounds the damage when
+nobody marks anything.
+
+**Variable budget nets out what is already spent.** Money spent on Tuesday has
+already left the account, so it is visible in the liquid balance. Reserving the
+full weekly budget on top of that charges the user twice for the same groceries.
+`variableRemaining = max(0, budget − spentThisWeek)`.
+
+**The strike rounds down, never up.** Rounding up would recommend money the
+buffer does not cover.
+
+**Allocation cascades and respects headroom.** If the top-ranked card has $40
+left and the buffer is $300, the remainder rolls to the next debt in rank order
+rather than overpaying by $260. Headroom is balance minus any minimum already
+reserved on that same debt — without that subtraction a $50 balance with a $35
+minimum would be told to pay $85.
+
+**Overdue minimums outrank the strike.** A missed $35 minimum draws roughly a
+$40 late fee and can trigger a penalty APR, which outruns anything the avalanche
+saves that week. They become their own actions ahead of the strike; the cash was
+already reserved, so they are not subtracted twice.
+
+**Ties break deterministically.** Two cards at the same APR resolve by balance,
+then by id. Without a total order the target could flip between runs and the
+user would see the recommendation move for no visible reason.
+
+**Marking a strike paid is the only engine write to `debts`.** It reduces the
+balance (clamped at zero), rolls `next_due_date` forward a cycle, and records
+the minimum as paid for the cycle just closed — so the weekly loop is two taps
+rather than retyping balances. It refuses to apply twice.

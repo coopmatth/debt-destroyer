@@ -107,6 +107,9 @@ export type Database = {
           computed_at: string;
           created_at: string;
           updated_at: string;
+          engine_version: number;
+          next_payday: string | null;
+          shortfall_cents: number;
         };
         Insert: {
           id?: string;
@@ -126,6 +129,9 @@ export type Database = {
           computed_at?: string;
           created_at?: string;
           updated_at?: string;
+          engine_version?: number;
+          next_payday?: string | null;
+          shortfall_cents?: number;
         };
         Update: {
           id?: string;
@@ -145,6 +151,9 @@ export type Database = {
           computed_at?: string;
           created_at?: string;
           updated_at?: string;
+          engine_version?: number;
+          next_payday?: string | null;
+          shortfall_cents?: number;
         };
           Relationships: [
             {
@@ -261,6 +270,7 @@ export type Database = {
           is_active: boolean;
           created_at: string;
           updated_at: string;
+          last_paid_date: string | null;
         };
         Insert: {
           id?: string;
@@ -277,6 +287,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          last_paid_date?: string | null;
         };
         Update: {
           id?: string;
@@ -293,6 +304,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          last_paid_date?: string | null;
         };
           Relationships: [
             {
