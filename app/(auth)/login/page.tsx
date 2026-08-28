@@ -1,24 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Button, Card, Field, Input } from "@/components/ui";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [message, setMessage] = useState("");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setStatus("sending");
+    setMessage("");
 
     const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      password,
     });
 
     if (error) {
@@ -27,7 +29,8 @@ export default function LoginPage() {
       return;
     }
 
-    setStatus("sent");
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
@@ -38,30 +41,31 @@ export default function LoginPage() {
       </p>
 
       <Card>
-        {status === "sent" ? (
-          <div>
-            <p className="font-medium">Check your email</p>
-            <p className="mt-1 text-sm text-ink-secondary">
-              We sent a sign-in link to {email}. It expires in an hour.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Field label="Email" error={status === "error" ? message : undefined}>
-              <Input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-              />
-            </Field>
-            <Button type="submit" variant="primary" disabled={status === "sending"}>
-              {status === "sending" ? "Sending…" : "Email me a sign-in link"}
-            </Button>
-          </form>
-        )}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <Field label="Email" error={status === "error" ? message : undefined}>
+            <Input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+            />
+          </Field>
+          <Field label="Password">
+            <Input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+            />
+          </Field>
+          <Button type="submit" variant="primary" disabled={status === "sending"}>
+            {status === "sending" ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
       </Card>
     </main>
   );
