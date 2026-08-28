@@ -15,7 +15,7 @@ export function TopNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-hairline bg-surface/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-50 w-full border-b border-hairline bg-surface/80 backdrop-blur-lg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="text-xl font-bold tracking-tight text-ink">
