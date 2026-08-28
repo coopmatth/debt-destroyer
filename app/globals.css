@@ -2,24 +2,27 @@
 
 :root {
   color-scheme: dark;
-  --surface-page: #090a0f;
-  --surface-1: #11131a;
-  --surface-2: #1a1d27;
-  --surface-3: #222634;
+  
+  /* Deep, rich slate backgrounds */
+  --surface-page: #080c14;
+  --surface-1: #111827;
+  --surface-2: #1f2937;
+  --surface-3: #374151;
 
-  --ink-primary: #ffffff;
+  /* High contrast text */
+  --ink-primary: #f8fafc;
   --ink-secondary: #94a3b8;
-  --ink-muted: #64748b;
+  --ink-muted: #475569;
   --hairline: rgba(255, 255, 255, 0.08);
 
-  /* Series Colors */
-  --series-1: #3b82f6; /* Strike */
-  --series-2: #f97316; /* Bills */
-  --series-3: #10b981; /* Variable */
-  --series-4: #f59e0b; /* Minimums */
-  --series-5: #ec4899; /* Floor */
+  /* Vibrant Neon Series Colors */
+  --series-1: #0ea5e9; /* Cyan / Strike */
+  --series-2: #f97316; /* Orange / Bills */
+  --series-3: #10b981; /* Emerald / Variable */
+  --series-4: #f59e0b; /* Amber / Minimums */
+  --series-5: #d946ef; /* Fuchsia / Floor */
 
-  /* Status */
+  /* Vibrant Status Colors */
   --status-good: #22c55e;
   --status-warning: #eab308;
   --status-critical: #ef4444;
@@ -46,13 +49,13 @@
   --color-critical: var(--status-critical);
 }
 
-/* Hide scrollbar across all browsers */
+/* Hide scrollbars for a clean app feel */
 * {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 *::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  display: none;
 }
 
 body {
@@ -60,7 +63,6 @@ body {
   color: var(--ink-primary);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  user-select: none;
 }
 
 .tabular {
