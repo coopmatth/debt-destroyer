@@ -7,7 +7,7 @@ import { AllocationBar } from "@/components/dashboard/AllocationBar";
 import { Ledger } from "@/components/dashboard/Ledger";
 import { DebtRanking } from "@/components/dashboard/DebtRanking";
 import { ActionList, Blockers } from "@/components/dashboard/Alerts";
-import { WeeklyCalendar } from "@/components/dashboard/WeeklyCalendar";
+import { CalendarView } from "@/components/dashboard/CalendarView";
 import { Card, CardTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -17,14 +17,19 @@ export default async function DashboardPage() {
   if (!userId) redirect("/login");
 
   const db = createAdminClient();
-  const { plan } = await computeAndStoreWeeklyPlan(db, userId);
 
-  const { data: strike } = await db
-    .from("debt_strikes")
-    .select("id, status")
-    .eq("user_id", userId)
-    .eq("week_start", plan.weekStart)
-    .maybeSingle();
+  const [{ plan }, { data: strike }, { data: debts }, { data: expenses }] =
+    await Promise.all([
+      computeAndStoreWeeklyPlan(db, userId),
+      db
+        .from("debt_strikes")
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("week_start", (await computeAndStoreWeeklyPlan(db, userId)).plan.weekStart)
+        .maybeSingle(),
+      db.from("debts").select("*").eq("user_id", userId).eq("is_active", true),
+      db.from("expenses").select("*").eq("user_id", userId).eq("is_active", true),
+    ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,7 +39,11 @@ export default async function DashboardPage() {
         status={strike?.status ?? null}
       />
 
-      <WeeklyCalendar plan={plan} />
+      <CalendarView
+        plan={plan}
+        debts={debts ?? []}
+        expenses={expenses ?? []}
+      />
 
       <Blockers plan={plan} />
 
