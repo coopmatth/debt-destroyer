@@ -27,5 +27,7 @@ in interest.
 
 ## Getting started
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the project layout, data
-flow, and setup steps.
+- **Self-hosting on Linux, reached from a phone over Tailscale:**
+  [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) — the full step-by-step.
+- **How it is built:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — project
+  layout, data flow, and the reasoning behind the schema and the algorithm.

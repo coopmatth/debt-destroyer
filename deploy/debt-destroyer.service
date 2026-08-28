@@ -1,0 +1,39 @@
+# Debt Destroyer — Next.js server
+#
+# Install:
+#   sudo cp deploy/debt-destroyer.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now debt-destroyer
+#
+# Adjust User and WorkingDirectory to match your box.
+
+[Unit]
+Description=Debt Destroyer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change to the account that owns /opt/debt-destroyer.
+User=debtdestroyer
+WorkingDirectory=/opt/debt-destroyer
+# Next reads .env.local from WorkingDirectory at startup, so secrets stay out of
+# this unit file. NEXT_PUBLIC_* values are baked in at build time, not read here.
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Bind to loopback only. Tailscale Serve terminates TLS and proxies to it, so
+# the app is never listening on the LAN or the public internet.
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+# The process needs nothing outside its own directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/debt-destroyer/.next
+
+[Install]
+WantedBy=multi-user.target

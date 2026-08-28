@@ -12,7 +12,14 @@ import { Button } from "@/components/ui";
  * public_token, and the exchange route swaps it for an access_token that never
  * reaches the browser. `itemId` puts Link into update mode to re-authenticate a
  * connection that has expired.
+ *
+ * The token is stashed in localStorage because most large US banks use OAuth:
+ * Link sends the browser to the bank's own site and back to
+ * /plaid/oauth-return, at which point this page is gone. The return page needs
+ * the *same* link_token to resume — a fresh one restarts the whole flow.
  */
+export const PLAID_LINK_TOKEN_KEY = "debt-destroyer.plaid_link_token";
+
 export function PlaidLinkButton({
   itemId,
   label = "Connect a bank account",
@@ -44,6 +51,12 @@ export function PlaidLinkButton({
 
       const body = await response.json();
       setLinkToken(body.linkToken);
+
+      try {
+        window.localStorage.setItem(PLAID_LINK_TOKEN_KEY, body.linkToken);
+      } catch {
+        // Private mode or blocked storage: non-OAuth banks still work.
+      }
     }
 
     void fetchToken();
@@ -61,6 +74,12 @@ export function PlaidLinkButton({
         body: JSON.stringify({ publicToken }),
       });
       setBusy(false);
+
+      try {
+        window.localStorage.removeItem(PLAID_LINK_TOKEN_KEY);
+      } catch {
+        // Nothing to clean up.
+      }
 
       if (!response.ok) {
         setError("Linked at the bank, but saving it failed. Try again.");

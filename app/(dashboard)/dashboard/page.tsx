@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUserId } from "@/lib/supabase/server";
-import { computeWeeklyPlan } from "@/lib/engine";
-import { loadPlanInput } from "@/lib/engine/loader";
+import { computeAndStoreWeeklyPlan } from "@/lib/engine/loader";
 import { StrikeCard } from "@/components/dashboard/StrikeCard";
 import { AllocationBar } from "@/components/dashboard/AllocationBar";
 import { Ledger } from "@/components/dashboard/Ledger";
@@ -18,10 +17,18 @@ export default async function DashboardPage() {
 
   const db = createAdminClient();
 
-  // Computed on the server, not fetched over HTTP from our own API — one less
-  // round trip and no risk of the page and the route disagreeing.
-  const input = await loadPlanInput(db, userId);
-  const plan = computeWeeklyPlan(input);
+  /**
+   * Computed on the server, not fetched over HTTP from our own API — one less
+   * round trip and no risk of the page and the route disagreeing.
+   *
+   * Viewing the dashboard also persists the week's strike. That is a write on a
+   * read, which is not free, but the alternative is worse: "I paid this" needs a
+   * strike row to attach to, so without this the button never appears until some
+   * scheduled job happens to have run. On a self-hosted box with no scheduler
+   * that is never. The upsert is idempotent per (user_id, week_start) and
+   * refuses to overwrite a strike already accepted or paid.
+   */
+  const { plan } = await computeAndStoreWeeklyPlan(db, userId);
 
   const { data: strike } = await db
     .from("debt_strikes")

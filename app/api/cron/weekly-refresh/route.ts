@@ -30,15 +30,27 @@ export async function GET(request: Request) {
   }
 
   const db = createAdminClient();
-  const { data: users, error } = await db
-    .from("users")
-    .select("id")
-    .not("onboarding_completed_at", "is", null);
+  /**
+   * The users worth refreshing are the ones with a live bank connection.
+   *
+   * This used to filter on `onboarding_completed_at`, which nothing in the app
+   * ever sets — so the scheduled run processed nobody, silently, forever. Keying
+   * off plaid_items is both correct and self-maintaining: link a bank and you
+   * are in the run; revoke it and you drop out.
+   */
+  const { data: linkedItems, error } = await db
+    .from("plaid_items")
+    .select("user_id")
+    .neq("status", "revoked");
 
   if (error) {
     console.error("Could not list users for refresh", error);
     return NextResponse.json({ error: "Could not list users" }, { status: 500 });
   }
+
+  const users = [...new Set((linkedItems ?? []).map((row) => row.user_id))].map((id) => ({
+    id,
+  }));
 
   let synced = 0;
   let planned = 0;
