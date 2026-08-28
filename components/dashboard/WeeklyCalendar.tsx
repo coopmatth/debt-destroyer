@@ -1,4 +1,4 @@
-import { formatCents, formatDueDate } from "@/lib/format";
+import { formatCents } from "@/lib/format";
 import { addDays, parseIsoDate } from "@/lib/engine/dates";
 import type { WeeklyPlan } from "@/lib/engine/types";
 

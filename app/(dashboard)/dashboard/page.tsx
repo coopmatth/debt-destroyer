@@ -18,18 +18,26 @@ export default async function DashboardPage() {
 
   const db = createAdminClient();
 
-  const [{ plan }, { data: strike }, { data: debts }, { data: expenses }] =
-    await Promise.all([
-      computeAndStoreWeeklyPlan(db, userId),
-      db
-        .from("debt_strikes")
-        .select("id, status")
-        .eq("user_id", userId)
-        .eq("week_start", (await computeAndStoreWeeklyPlan(db, userId)).plan.weekStart)
-        .maybeSingle(),
-      db.from("debts").select("*").eq("user_id", userId).eq("is_active", true),
-      db.from("expenses").select("*").eq("user_id", userId).eq("is_active", true),
-    ]);
+  /**
+   * Compute once, then read. This cannot join the Promise.all below: the call
+   * both computes the plan and persists the week's strike, so the strike row
+   * has to exist before it is queried, and `plan.weekStart` is the key to query
+   * on. Running it inside the array — and a second time to get weekStart — put
+   * two concurrent upserts on the same (user_id, week_start) and did the whole
+   * engine pass twice on every page load.
+   */
+  const { plan } = await computeAndStoreWeeklyPlan(db, userId);
+
+  const [{ data: strike }, { data: debts }, { data: expenses }] = await Promise.all([
+    db
+      .from("debt_strikes")
+      .select("id, status")
+      .eq("user_id", userId)
+      .eq("week_start", plan.weekStart)
+      .maybeSingle(),
+    db.from("debts").select("*").eq("user_id", userId).eq("is_active", true),
+    db.from("expenses").select("*").eq("user_id", userId).eq("is_active", true),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">

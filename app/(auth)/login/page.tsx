@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Button, Card, Field, Input } from "@/components/ui";
 
+/**
+ * Email + password sign-in.
+ *
+ * Create the account in Supabase → Authentication → Users; there is no public
+ * sign-up route, which is the intent for a single-user instance.
+ */
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
@@ -17,33 +25,32 @@ export default function LoginPage() {
 
     try {
       const supabase = createBrowserSupabaseClient();
-      console.log("Submitting login to Supabase...");
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (error) {
-        console.error("Auth error:", error);
         setStatus("error");
         setMessage(error.message);
-        alert("Login Error: " + error.message);
         return;
       }
 
-      if (data?.session) {
-        console.log("Session obtained, redirecting...");
-        window.location.href = "/dashboard";
-      } else {
-        alert("No session returned from Supabase.");
-        setStatus("idle");
+      if (!data.session) {
+        setStatus("error");
+        setMessage("Signed in, but no session came back. Try again.");
+        return;
       }
-    } catch (err: any) {
-      console.error("Unexpected error:", err);
+
+      // refresh() re-runs the server components with the session cookie the
+      // client just set, so middleware sees it and does not bounce back here.
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err) {
       setStatus("error");
-      setMessage(err.message || "Failed to reach auth server");
-      alert("Network / Execution Error: " + (err.message || String(err)));
+      setMessage(
+        err instanceof Error ? err.message : "Could not reach the auth server.",
+      );
     }
   }
 
@@ -56,7 +63,7 @@ export default function LoginPage() {
 
       <Card>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Field label="Email" error={status === "error" ? message : undefined}>
+          <Field label="Email">
             <Input
               type="email"
               value={email}
@@ -66,7 +73,10 @@ export default function LoginPage() {
               autoComplete="email"
             />
           </Field>
-          <Field label="Password">
+          <Field
+            label="Password"
+            error={status === "error" ? message : undefined}
+          >
             <Input
               type="password"
               value={password}
