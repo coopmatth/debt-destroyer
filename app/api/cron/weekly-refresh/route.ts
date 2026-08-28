@@ -7,7 +7,14 @@ import { serverEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+/**
+ * 60s is the ceiling every Vercel plan allows, so this deploys anywhere. The
+ * run is sequential per user and each user has a handful of connections, so a
+ * personal instance finishes in seconds. If this ever runs long, the fix is to
+ * page through users across several invocations rather than to ask for a
+ * longer function.
+ */
+export const maxDuration = 60;
 
 /**
  * Monday morning: refresh every user's bank data, then recompute their strike.

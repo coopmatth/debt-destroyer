@@ -27,7 +27,9 @@ in interest.
 
 ## Getting started
 
-- **Self-hosting on Linux, reached from a phone over Tailscale:**
-  [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) — the full step-by-step.
+- **Deploying to Vercel:** [docs/DEPLOY-VERCEL.md](docs/DEPLOY-VERCEL.md) —
+  the full step-by-step, in the order the URLs have to be registered.
+- **Self-hosting on Linux behind Tailscale:**
+  [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) — same code, private network.
 - **How it is built:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — project
   layout, data flow, and the reasoning behind the schema and the algorithm.
