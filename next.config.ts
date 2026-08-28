@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
-  // The Plaid Node SDK is server-only. Keeping it external stops the bundler
-  // from ever tracing it into a client chunk alongside our secrets.
-  serverExternalPackages: ["plaid"],
+  allowedDevOrigins: ["100.110.117.87", "localhost:3000"],
 };
 
 export default nextConfig;
