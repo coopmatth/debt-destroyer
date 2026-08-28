@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Design tokens for the dashboard built in Phase 4. Money-negative states get
+   their own token so "you're short this week" never reads as a generic error. */
+@theme {
+  --color-strike: oklch(0.72 0.19 145);
+  --color-strike-dim: oklch(0.28 0.06 145);
+  --color-danger: oklch(0.65 0.21 25);
+  --color-surface: oklch(0.18 0.01 260);
+  --color-surface-raised: oklch(0.23 0.012 260);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-surface);
+  color: oklch(0.97 0 0);
+  -webkit-font-smoothing: antialiased;
+}
