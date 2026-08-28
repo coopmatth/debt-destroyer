@@ -19,21 +19,26 @@ debt-destroyer/
 │       ├── plaid/
 │       │   ├── create-link-token/       POST → link_token for Plaid Link  [Phase 2]
 │       │   ├── exchange-public-token/   POST → access_token, encrypt+store[Phase 2]
-│       │   ├── sync/                    POST → /transactions/sync + liabilities [Phase 2]
+│       │   ├── sync/                    POST → balances + transactions/sync [Phase 2]
 │       │   └── webhook/                 POST ← Plaid item/txn webhooks    [Phase 2]
+│       ├── debts/                        Manual debt CRUD (RLS-scoped)     [Phase 2]
+│       ├── expenses/                     Manual bill CRUD (RLS-scoped)     [Phase 2]
 │       ├── engine/
 │       │   └── weekly-plan/             GET  → compute + persist a strike [Phase 3]
 │       └── cron/
 │           └── weekly-refresh/          Vercel Cron: sync all, recompute  [Phase 3]
 ├── lib/
-│   ├── plaid/         client.ts, link.ts, liabilities.ts, transactions.ts, mappers.ts  [Phase 2]
+│   ├── plaid/         client.ts, link.ts, accounts.ts, transactions.ts, mappers.ts  [Phase 2]
+│   ├── validation/    debts.ts, expenses.ts — zod schemas shared by API and forms
+│   ├── money.ts       cents ↔ dollars, currency formatting
 │   ├── supabase/      client.ts (browser), server.ts (RSC/route), admin.ts (service role)
-│   ├── engine/        money.ts, cashflow.ts, strategy.ts, types.ts       [Phase 3]
+│   ├── engine/        cashflow.ts, strategy.ts, types.ts                  [Phase 3]
 │   └── crypto/        tokens.ts — AES-256-GCM encrypt/decrypt of access tokens [Phase 2]
 ├── components/        ui/ (primitives), plaid/ (Link button), dashboard/ (cards)
 ├── supabase/migrations/
 │   ├── 0001_initial_schema.sql
-│   └── 0002_rls_policies.sql
+│   ├── 0002_rls_policies.sql
+│   └── 0003_manual_debt_tracking.sql
 ├── types/             database.types.ts (generated), domain.ts
 ├── tests/             engine unit tests                                   [Phase 3]
 └── vercel.json        Weekly cron + function duration overrides
@@ -55,8 +60,12 @@ Plaid Link (browser)
 Vercel Cron (weekly) / Plaid webhook
    ▼
 /api/plaid/sync ──► /accounts/balance/get   → accounts.current_balance_cents
-                ──► /liabilities/get        → debts.apr, minimum_payment, next_due_date
                 ──► /transactions/sync      → transactions (cursor on plaid_items)
+
+User (dashboard forms)
+   ▼
+/api/debts, /api/expenses ──► debts.apr, minimum_payment_cents, next_due_date
+                          ──► expenses.amount_cents, frequency, next_due_date
    ▼
 Cash Flow Engine (lib/engine, pure functions — no I/O)
    liquid cash − (fixed due before payday + variable budget + minimums + floor)
@@ -79,7 +88,8 @@ migrations; `npm run db:types` generates the TypeScript.
 **Money as integer cents everywhere.** JS floats cannot represent 0.1 exactly;
 summing dollar floats across a few dozen transactions accumulates error into a
 number we tell someone to pay a bank. Cents are integers up to ~$90T. Conversion
-happens once, at the Plaid boundary.
+lives in `lib/money.ts` and happens only at the edges: values arriving from
+Plaid, and values typed into or rendered on a form.
 
 **The engine is pure.** `lib/engine` takes plain data in and returns a plan out —
 no database calls, no `new Date()` inside the math (the clock is an argument).
@@ -100,31 +110,35 @@ reach of client roles entirely (RLS filters rows, not columns).
 > with `permission denied` for a logged-in user, by design. Always name the
 > columns. Only the service-role client can read the token column.
 
-**Server-authoritative writes.** Clients can edit expenses and manually-added
-debts. They cannot write account balances, synced debt APRs, or the recommended
-strike amount — those tables have no client INSERT/UPDATE policy, so the service
-role is the only writer.
+**Server-authoritative writes.** Clients own their debts and bills — that is the
+whole input side now. They still cannot write account balances (Plaid-synced) or
+the recommended strike amount (engine-computed): those have no client
+INSERT/UPDATE policy, so the service role is the only writer.
 
 ## Build phases
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | SQL schema, RLS, project scaffold | done |
-| 2 | Plaid utilities: token exchange, liabilities, transactions | done |
+| 2 | Plaid (balances + transactions), manual debt/bill entry | done |
 | 3 | Cash Flow Engine + avalanche/snowball algorithm | pending approval |
 | 4 | Dashboard components | pending |
 
 ## Phase 2 notes
 
-**Blended APR.** A card reporting 0% on a transferred balance and 24.99% on
-purchases cannot be ranked by either number alone. `effectiveApr()` computes the
-balance-weighted blend, `Σ(apr × balance) / Σ(balance)`, which is what the card
-actually costs to carry. Where issuers omit `balance_subject_to_apr` it falls
-back to a single rate by priority, preferring purchase APR. Stored `apr_type`
-records which path ran (`blended` vs. the Plaid apr_type), so the UI can explain
-the ranking. Open item for Phase 4: a blended rate understates a promo card in
-the week its 0% period ends — surface promo expiry rather than let the blend
-bury it.
+**Plaid scope: depository only.** Plaid links bank accounts for balances and
+transactions. Debts and bills are entered by hand, so Liabilities is not
+requested and no product approval is needed for it. The liability mapping code
+(including balance-weighted APR blending across a card's several rates) was
+removed in the manual-entry change and is recoverable from git history if a card
+is ever linked directly.
+
+**Manual entry is server-validated, RLS-enforced.** `/api/debts` and
+`/api/expenses` use the request-scoped client carrying the user's JWT, not the
+service role — so ownership is enforced by Postgres, and a forgotten filter
+returns nothing rather than everything. Zod schemas in `lib/validation` are
+shared with the Phase 4 forms so the rules are stated once. Debts are soft
+deleted (`is_active = false`) because past strikes reference them.
 
 **Cursor safety.** `/transactions/sync` writes its cursor only after the rows
 land. Advancing it first means a failed insert skips those transactions
@@ -142,6 +156,14 @@ so every request is verified: ES256 JWT against Plaid's published key, plus a
 SHA-256 match on the exact raw body, plus an `iat` freshness bound. Parse JSON
 only after that passes.
 
+**Minimum payments expire on their own.** `min_payment_met_for_cycle` was a
+boolean, safe only while a nightly liabilities sync overwrote it. With manual
+entry it became a latch: ticked in August, still true in September, and the
+engine would route the strike past a real unpaid minimum. Migration 0003
+replaces it with `min_payment_paid_for_due_date` — the due date the payment was
+made *for*. The engine compares it to the current `next_due_date`, so a stale
+value fails closed.
+
 ## Setup
 
 ```bash
@@ -154,5 +176,5 @@ npm run dev
 ```
 
 Plaid environments are **sandbox** and **production** — `development` was retired
-in 2024. Liabilities requires product access approval on a production account, so
-request it before you plan around live APRs.
+in 2024. Only the Transactions product is requested; debts and bills are entered
+by hand, so no Liabilities approval is needed.

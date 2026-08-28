@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       publicToken: parsed.data.publicToken,
     });
 
-    // Pull liabilities and transactions right away so the user sees real APRs
+    // Pull balances and transactions right away so the user sees real numbers
     // instead of an empty dashboard. Failures here don't undo the link.
     const sync = await syncItem(result.itemId);
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       institutionName: result.institutionName,
       accountsLinked: result.accountsLinked,
       synced: sync.ok,
-      debtsFound: sync.debtsUpserted,
+      transactionsImported: sync.transactionsAdded,
     });
   } catch (err) {
     if (err instanceof PlaidRequestError) {

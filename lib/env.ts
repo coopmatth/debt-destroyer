@@ -15,7 +15,9 @@ const serverSchema = z.object({
   // The SDK itself only ships `sandbox` and `production`; Plaid retired the
   // development environment in 2024.
   PLAID_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
-  PLAID_PRODUCTS: z.string().default("transactions,liabilities"),
+  // Depository accounts only: balances and transactions. Debts and bills
+  // are entered by hand, so Liabilities is not requested.
+  PLAID_PRODUCTS: z.string().default("transactions"),
   PLAID_COUNTRY_CODES: z.string().default("US"),
   PLAID_REDIRECT_URI: z.string().url().optional(),
   PLAID_WEBHOOK_URL: z.string().url().optional(),

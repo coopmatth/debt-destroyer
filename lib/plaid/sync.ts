@@ -7,14 +7,13 @@ import {
   loadLinkedItem,
   recordItemError,
 } from "@/lib/plaid/items";
-import { syncBalances, syncLiabilities } from "@/lib/plaid/liabilities";
+import { syncBalances } from "@/lib/plaid/accounts";
 import { syncTransactions } from "@/lib/plaid/transactions";
 
 export interface ItemSyncReport {
   itemId: string;
   ok: boolean;
   accountsUpdated: number;
-  debtsUpserted: number;
   transactionsAdded: number;
   transactionsModified: number;
   transactionsRemoved: number;
@@ -22,7 +21,7 @@ export interface ItemSyncReport {
 }
 
 /**
- * Full refresh for one item: balances, liabilities, then transactions.
+ * Full refresh for one item: balances, then transactions.
  *
  * Failures are captured per item rather than thrown, so one bank with an
  * expired login does not abort the sync for every other connection the user
@@ -34,7 +33,6 @@ export async function syncItem(itemId: string): Promise<ItemSyncReport> {
     itemId,
     ok: false,
     accountsUpdated: 0,
-    debtsUpserted: 0,
     transactionsAdded: 0,
     transactionsModified: 0,
     transactionsRemoved: 0,
@@ -45,9 +43,6 @@ export async function syncItem(itemId: string): Promise<ItemSyncReport> {
 
     const balances = await syncBalances(db, item);
     report.accountsUpdated = balances.accountsUpdated;
-
-    const liabilities = await syncLiabilities(db, item);
-    report.debtsUpserted = liabilities.debtsUpserted;
 
     const transactions = await syncTransactions(db, item);
     report.transactionsAdded = transactions.added;

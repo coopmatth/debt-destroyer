@@ -24,7 +24,6 @@ export async function POST() {
       failures: failed.map((r) => ({ itemId: r.itemId, code: r.error })),
       totals: {
         accountsUpdated: reports.reduce((n, r) => n + r.accountsUpdated, 0),
-        debtsUpserted: reports.reduce((n, r) => n + r.debtsUpserted, 0),
         transactionsAdded: reports.reduce((n, r) => n + r.transactionsAdded, 0),
       },
     },

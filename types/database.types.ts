@@ -180,11 +180,11 @@ export type Database = {
           last_payment_date: string | null;
           last_payment_cents: number | null;
           is_overdue: boolean;
-          min_payment_met_for_cycle: boolean;
           is_manual: boolean | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
+          min_payment_paid_for_due_date: string | null;
         };
         Insert: {
           id?: string;
@@ -202,10 +202,10 @@ export type Database = {
           last_payment_date?: string | null;
           last_payment_cents?: number | null;
           is_overdue?: boolean;
-          min_payment_met_for_cycle?: boolean;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          min_payment_paid_for_due_date?: string | null;
         };
         Update: {
           id?: string;
@@ -223,10 +223,10 @@ export type Database = {
           last_payment_date?: string | null;
           last_payment_cents?: number | null;
           is_overdue?: boolean;
-          min_payment_met_for_cycle?: boolean;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+          min_payment_paid_for_due_date?: string | null;
         };
           Relationships: [
             {

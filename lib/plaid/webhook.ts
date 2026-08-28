@@ -143,8 +143,5 @@ export function shouldTriggerSync(body: PlaidWebhookBody): boolean {
       body.webhook_code === "HISTORICAL_UPDATE"
     );
   }
-  if (body.webhook_type === "LIABILITIES") {
-    return body.webhook_code === "DEFAULT_UPDATE";
-  }
   return false;
 }

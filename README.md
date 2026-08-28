@@ -6,7 +6,7 @@ Avalanche method (highest APR first), with a Snowball toggle.
 
 - **Frontend:** Next.js (App Router) + Tailwind CSS, deployed on Vercel
 - **Backend:** Supabase (PostgreSQL) with RLS, `@supabase/supabase-js`
-- **Bank data:** Plaid — Auth, Transactions, and Liabilities
+- **Bank data:** Plaid — bank balances and transactions (debts and bills are entered by hand)
 
 ## How the number is calculated
 
