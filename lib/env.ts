@@ -25,6 +25,17 @@ const serverSchema = z.object({
   // 32 raw bytes, base64 encoded: openssl rand -base64 32
   PLAID_TOKEN_ENCRYPTION_KEY: z.string().min(1),
 
+  // ---- AI advisory layer (Gemini) ----
+  // Optional on purpose: without a key the app runs exactly as before and the
+  // /api/ai/* routes return 503. A missing key must not stop the deterministic
+  // engine, which is the part that actually decides anything.
+  //
+  // GOOGLE_GENERATIVE_AI_API_KEY is the name @ai-sdk/google reads by default,
+  // so keeping it means the provider works with zero wiring.
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+  // Empty means the auto-updating alias. Pin a model id here to freeze it.
+  GEMINI_MODEL: z.string().default(""),
+
   NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
   CRON_SECRET: z.string().min(1).optional(),
 });

@@ -150,3 +150,43 @@ export interface WeeklyPlan {
   blockers: Blocker[];
   notes: string[];
 }
+
+// -----------------------------------------------------------------------------
+// Advisory layer
+//
+// These sit beside WeeklyPlan rather than inside it, on purpose.
+//
+// `WeeklyPlan` is the return type of a pure function. Every field on it is
+// something `computeWeeklyPlan` produces from its inputs, and the engine cannot
+// produce these — they come from a network call it does not make. Adding them
+// there would mean either changing the engine to populate them (which is off
+// limits, and rightly so) or leaving optional fields the engine never sets, so
+// that every consumer has to wonder whether a given plan's `ai` is absent
+// because no advice exists or because it simply was not fetched.
+//
+// A wrapper keeps that honest: hold a `WeeklyPlan` and you have the
+// deterministic truth; hold a `WeeklyPlanWithAdvice` and you have that plus a
+// clearly-typed second opinion, present or explicitly null.
+// -----------------------------------------------------------------------------
+
+/**
+ * A more conservative strike suggested by the advisory layer.
+ *
+ * Advice, never authority. The deterministic `recommendedStrikeCents` stays the
+ * computed truth; this is only preferred by the UI when it is genuinely lower,
+ * which is also what makes stale advice safe — a suggestion left over from a
+ * larger strike earlier in the week is simply ignored rather than acted on.
+ */
+export interface AiStrikeAdvice {
+  /** Cents. Clamped by the writer to at most the deterministic strike. */
+  adjustedAmountCents: number;
+  /** One or two sentences for the user. Model-generated prose — render as text. */
+  rationale: string;
+  /** When the advice was generated, so the UI can age it out. */
+  computedAt: string;
+}
+
+/** A deterministic plan carrying whatever advice exists for the same week. */
+export interface WeeklyPlanWithAdvice extends WeeklyPlan {
+  ai: AiStrikeAdvice | null;
+}

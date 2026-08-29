@@ -15,8 +15,10 @@
     "db:types": "supabase gen types typescript --linked --schema public > types/database.types.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.57",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "ai": "^7.0.84",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "jose": "^6.0.0",
