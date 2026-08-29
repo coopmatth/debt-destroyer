@@ -121,8 +121,12 @@ failing quietly.
 ```bash
 npx supabase login
 npx supabase link --project-ref <your-project-ref>   # from the Supabase URL
-npm run db:push                                      # applies migrations 0001–0004
+npm run db:push                                      # applies every migration
 ```
+
+Both commands fail with "Cannot find project ref" until `link` has run. The ref
+is the subdomain of your project URL: `https://abcdefgh.supabase.co` means
+`--project-ref abcdefgh`. Linking prompts for the database password.
 
 `db:push` will ask for the database password from step 2.
 
