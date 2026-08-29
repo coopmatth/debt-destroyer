@@ -20,7 +20,7 @@ export function ExpenseList({ expenses, today }: { expenses: Expense[]; today: s
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid gap-4 md:grid-cols-2 items-start">
       {expenses.map((expense) => (
         <ExpenseRow key={expense.id} expense={expense} today={today} />
       ))}
@@ -54,7 +54,7 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
   }
 
   return (
-    <Card className="p-4 sm:p-4">
+    <Card className="p-4 sm:p-4 h-full">
       {editing ? (
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
@@ -109,30 +109,32 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
           </div>
         </div>
       ) : (
-        <>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
-            <div>
-              <span className="font-medium text-ink">{expense.name}</span>
-              <span className="ml-2 text-xs text-ink-muted">
-                {titleCase(expense.category)} · {titleCase(expense.frequency)}
-              </span>
+        <div className="flex flex-col h-full justify-between">
+          <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
+              <div>
+                <span className="font-medium text-ink">{expense.name}</span>
+                <span className="ml-2 text-xs text-ink-muted">
+                  {titleCase(expense.category)} · {titleCase(expense.frequency)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {paid ? <Badge tone="good">✓ Paid this cycle</Badge> : null}
+                {overdue ? <Badge tone="critical">▲ Past due</Badge> : null}
+                {!expense.is_essential ? <Badge>Non-essential</Badge> : null}
+                <span className="tabular font-semibold text-ink">
+                  {formatCents(expense.amount_cents)}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {paid ? <Badge tone="good">✓ Paid this cycle</Badge> : null}
-              {overdue ? <Badge tone="critical">▲ Past due</Badge> : null}
-              {!expense.is_essential ? <Badge>Non-essential</Badge> : null}
-              <span className="tabular font-semibold text-ink">
-                {formatCents(expense.amount_cents)}
-              </span>
-            </div>
+
+            <p className="mt-1 text-xs text-ink-muted">
+              Due {formatDueDate(expense.next_due_date, today)} (
+              {formatRelativeDays(expense.next_due_date, today)})
+            </p>
           </div>
 
-          <p className="mt-1 text-xs text-ink-muted">
-            Due {formatDueDate(expense.next_due_date, today)} (
-            {formatRelativeDays(expense.next_due_date, today)})
-          </p>
-
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-hairline">
             <Button size="sm" onClick={() => setEditing(true)}>
               Edit details
             </Button>
@@ -159,7 +161,7 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
               Remove
             </Button>
           </div>
-        </>
+        </div>
       )}
     </Card>
   );
