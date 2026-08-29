@@ -30,7 +30,7 @@ export function ManualRealityCheck() {
         setMessage(`Done! Adjusted strike: $${(body.adjusted_strike_cents / 100).toFixed(2)}.`);
       }
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("Network error occurred.");
     } finally {
       setBusy(false);
@@ -43,7 +43,7 @@ export function ManualRealityCheck() {
         <div>
           <CardTitle hint="AI second opinion">Manual Reality Check</CardTitle>
           <p className="mt-1 text-sm text-ink-muted">
-            Analyze your recent spending volatility and cash floor to adjust this week's strike amount.
+            Analyze your recent spending volatility and cash floor to adjust this week&rsquo;s strike amount.
           </p>
         </div>
         <Button onClick={runCheck} disabled={busy}>

@@ -1,6 +1,16 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function autoDetectPayments(userId: string, newTransactions: any[]) {
+interface DetectableTransaction {
+  amount_cents: number;
+  date: string;
+  merchant_name: string | null;
+  is_transfer: boolean;
+}
+
+export async function autoDetectPayments(
+  userId: string,
+  newTransactions: DetectableTransaction[],
+) {
   const db = createAdminClient();
   const { data: debts } = await db.from("debts").select("*").eq("user_id", userId).eq("is_active", true);
 

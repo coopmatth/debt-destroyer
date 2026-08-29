@@ -22,7 +22,7 @@ export function ResetSpending() {
         <div>
           <CardTitle>Reset Weekly Spending</CardTitle>
           <p className="mt-1 text-sm text-ink-muted">
-            Zero out your tracked spending for the current week. This tells the engine to ignore recent purchases so they don't shrink your safe-to-spend buffer.
+            Zero out your tracked spending for the current week. This tells the engine to ignore recent purchases so they don&rsquo;t shrink your safe-to-spend buffer.
           </p>
         </div>
         <Button onClick={handleReset} disabled={busy} variant="danger">
