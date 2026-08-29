@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { todayInTimezone, startOfWeekMonday } from "@/lib/engine/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST() {
+  // Use the standard client to verify the user's identity securely
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,8 +21,9 @@ export async function POST() {
   const today = todayInTimezone(profile?.timezone ?? "UTC");
   const weekStart = startOfWeekMonday(today);
 
-  // Marks all transactions this week as transfers so they don't count against the budget
-  const { error } = await supabase
+  // Use the admin client to bypass RLS and force the transaction update
+  const adminDb = createAdminClient();
+  const { error } = await adminDb
     .from("transactions")
     .update({ is_transfer: true })
     .eq("user_id", user.id)
