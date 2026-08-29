@@ -31,7 +31,12 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  const [name, setName] = useState(debt.name);
   const [balance, setBalance] = useState((debt.current_balance_cents / 100).toFixed(2));
+  const [minimum, setMinimum] = useState((debt.minimum_payment_cents / 100).toFixed(2));
+  const [apr, setApr] = useState(debt.apr.toString());
+  const [dueDate, setDueDate] = useState(debt.next_due_date ?? "");
 
   const minimumMet =
     debt.next_due_date !== null &&
@@ -53,87 +58,139 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
 
   return (
     <Card className="p-4 sm:p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
-        <div>
-          <span className="font-medium text-ink">{debt.name}</span>
-          <span className="tabular ml-2 text-sm text-ink-muted">
-            {formatApr(debt.apr)} APR
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {minimumMet ? <Badge tone="good">✓ Minimum paid</Badge> : null}
-          {overdue ? <Badge tone="critical">▲ Minimum overdue</Badge> : null}
-          <span className="tabular font-semibold text-ink">
-            {formatCents(debt.current_balance_cents)}
-          </span>
-        </div>
-      </div>
-
-      <p className="mt-1 text-xs text-ink-muted tabular">
-        Minimum {formatCents(debt.minimum_payment_cents)}
-        {debt.next_due_date
-          ? ` · due ${formatDueDate(debt.next_due_date, today)} (${formatRelativeDays(debt.next_due_date, today)})`
-          : " · no due date set"}
-      </p>
-
       {editing ? (
-        <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-ink-secondary">New balance ($)</span>
+            <span className="text-xs text-ink-secondary">Name</span>
             <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={balance}
-              onChange={(event) => setBalance(event.target.value)}
-              className="w-36 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm"
             />
           </label>
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={busy}
-            onClick={() =>
-              patch({ current_balance_cents: dollarsToCents(Number(balance)) ?? 0 })
-            }
-          >
-            Save
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => setEditing(true)}>
-            Update balance
-          </Button>
-          {debt.next_due_date && !minimumMet ? (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-secondary">Balance ($)</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={balance}
+                onChange={(e) => setBalance(e.target.value)}
+                className="w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-secondary">Minimum ($)</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={minimum}
+                onChange={(e) => setMinimum(e.target.value)}
+                className="w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-secondary">APR (%)</span>
+              <input
+                type="number"
+                step="0.0001"
+                min="0"
+                value={apr}
+                onChange={(e) => setApr(e.target.value)}
+                className="w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-secondary">Next due date</span>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
             <Button
               size="sm"
+              variant="primary"
               disabled={busy}
               onClick={() =>
-                patch({ min_payment_paid_for_due_date: debt.next_due_date })
+                patch({
+                  name: name.trim(),
+                  current_balance_cents: dollarsToCents(Number(balance)) ?? 0,
+                  minimum_payment_cents: dollarsToCents(Number(minimum)) ?? 0,
+                  apr: Number(apr),
+                  next_due_date: dueDate || null,
+                })
               }
             >
-              Mark minimum paid
+              Save
             </Button>
-          ) : null}
-          <Button
-            size="sm"
-            variant="danger"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              await fetch(`/api/debts/${debt.id}`, { method: "DELETE" });
-              setBusy(false);
-              router.refresh();
-            }}
-          >
-            Remove
-          </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
+            <div>
+              <span className="font-medium text-ink">{debt.name}</span>
+              <span className="tabular ml-2 text-sm text-ink-muted">
+                {formatApr(debt.apr)} APR
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {minimumMet ? <Badge tone="good">✓ Minimum paid</Badge> : null}
+              {overdue ? <Badge tone="critical">▲ Minimum overdue</Badge> : null}
+              <span className="tabular font-semibold text-ink">
+                {formatCents(debt.current_balance_cents)}
+              </span>
+            </div>
+          </div>
+
+          <p className="mt-1 text-xs text-ink-muted tabular">
+            Minimum {formatCents(debt.minimum_payment_cents)}
+            {debt.next_due_date
+              ? ` · due ${formatDueDate(debt.next_due_date, today)} (${formatRelativeDays(debt.next_due_date, today)})`
+              : " · no due date set"}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setEditing(true)}>
+              Edit details
+            </Button>
+            {debt.next_due_date && !minimumMet ? (
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  patch({ min_payment_paid_for_due_date: debt.next_due_date })
+                }
+              >
+                Mark minimum paid
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await fetch(`/api/debts/${debt.id}`, { method: "DELETE" });
+                setBusy(false);
+                router.refresh();
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+        </>
       )}
     </Card>
   );
