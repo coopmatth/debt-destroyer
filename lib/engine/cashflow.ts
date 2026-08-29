@@ -1,3 +1,23 @@
+import { addDays, type IsoDate } from "@/lib/engine/dates";
+import type { EngineTransaction } from "@/lib/engine/types";
+
+export function calculateDynamicBudget(
+  transactions: EngineTransaction[],
+  hardCeilingCents: number,
+  today: IsoDate
+): number {
+  const windowStart = addDays(today, -30);
+  const recentSpend = transactions
+    .filter((t) => !t.isTransfer && t.amountCents > 0 && t.date >= windowStart)
+    .reduce((sum, t) => sum + t.amountCents, 0);
+
+  // Average weekly spend over the last month
+  const rollingWeeklyAvg = Math.round(recentSpend / 4.33);
+  
+  // Clamp to never exceed the user's safety ceiling
+  return Math.min(rollingWeeklyAvg, hardCeilingCents);
+}
+
 import {
   addDays,
   isWithin,
