@@ -4,13 +4,6 @@ import type { Database } from "@/types/database.types";
 
 const PUBLIC_PATHS = ["/", "/login", "/auth"];
 
-/**
- * Refreshes the Supabase session on every request and gates the dashboard.
- *
- * The cookie dance matters: tokens rotate, and the refreshed cookies have to be
- * written onto the response that is actually returned — which is why the
- * response object is created first and mutated in place rather than rebuilt.
- */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -35,8 +28,6 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // getUser, not getSession: getSession trusts the cookie as presented, getUser
-  // revalidates it with the auth server.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -53,7 +44,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirect);
   }
 
-  if (user && pathname === "/login") {
+  // Automatically bypass the root page and login page if already signed in
+  if (user && (pathname === "/login" || pathname === "/")) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/dashboard";
     redirect.search = "";

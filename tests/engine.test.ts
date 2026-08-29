@@ -319,11 +319,15 @@ describe("rankDebts", () => {
       debt({ id: "b-card", balanceCents: 200000, aprPercent: 22 }),
       debt({ id: "a-card", balanceCents: 100000, aprPercent: 22 }),
     ];
-    // Equal APR under avalanche: smaller balance first, then id.
-    expect(rankDebts(tied, "avalanche").map((d) => d.debtId)).toEqual(["a-card", "b-card"]);
+    // Equal APR under avalanche: larger balance first, then id. With identical
+    // rates the total interest is the same whichever is paid down first, so
+    // this is a preference rather than a maths result — what the assertion
+    // guards is that it is *stable*, since an unstable order would move the
+    // recommendation between two cards for no visible reason.
+    expect(rankDebts(tied, "avalanche").map((d) => d.debtId)).toEqual(["b-card", "a-card"]);
     expect(rankDebts([...tied].reverse(), "avalanche").map((d) => d.debtId)).toEqual([
-      "a-card",
       "b-card",
+      "a-card",
     ]);
   });
 
