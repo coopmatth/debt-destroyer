@@ -2,30 +2,26 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUserId } from "@/lib/supabase/server";
 import { AiUnavailableError, isAiConfigured } from "@/lib/ai/client";
-import { runRealityCheck } from "@/lib/ai/reality-check";
-import { computeVolatility } from "@/lib/ai/volatility";
+import { generateAndStoreRealityCheck } from "@/lib/ai/reality-check";
 import { computeAndStoreWeeklyPlan } from "@/lib/engine/loader";
-import { addDays } from "@/lib/engine/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const VOLATILITY_WINDOW_DAYS = 14;
-
 /**
- * A second opinion on this week's strike.
+ * A second opinion on this week's strike, on demand.
  *
  * The brief called for the WeeklyPlan to arrive in the request body. It is
  * recomputed server-side instead, deliberately: this route writes to
  * debt_strikes, and a plan supplied by the caller is a number the caller chose.
  * Accepting it would hand back exactly the forgery route that migration 0005
  * closed — post a plan claiming a $9,000 strike and the stored advice inherits
- * it. The client already has the plan for display; sending it back proves
- * nothing.
+ * it as its ceiling. The client already has the plan for display; sending it
+ * back proves nothing.
  *
- * Recomputing also guarantees the strike row exists before we update it, and
- * costs one query set on a route that is about to make a network call anyway.
+ * The work itself lives in generateAndStoreRealityCheck, shared with the weekly
+ * cron, so scheduled advice and requested advice are the same advice.
  */
 export async function POST() {
   const userId = await getAuthenticatedUserId();
@@ -45,59 +41,21 @@ export async function POST() {
 
   try {
     const { plan } = await computeAndStoreWeeklyPlan(db, userId);
+    const outcome = await generateAndStoreRealityCheck(db, userId, plan);
 
-    // Nothing to moderate. Skip the model rather than spend a call asking it to
-    // be careful with zero dollars.
-    if (plan.recommendedStrikeCents <= 0) {
+    if (outcome.status === "skipped") {
       return NextResponse.json({
         adjusted_strike_cents: 0,
         rationale_string: null,
-        skipped: "no_strike",
-        message: "There is no surplus to adjust this week.",
+        skipped: outcome.reason,
+        message:
+          outcome.reason === "no_strike"
+            ? "There is no surplus to adjust this week."
+            : "The reality check is not configured on this instance.",
       });
     }
 
-    const windowStart = addDays(plan.today, -(VOLATILITY_WINDOW_DAYS - 1));
-    const { data: transactions, error } = await db
-      .from("transactions")
-      .select("amount_cents, date, is_transfer")
-      .eq("user_id", userId)
-      .gte("date", windowStart)
-      .lte("date", plan.today);
-
-    if (error) {
-      console.error("Reality check transaction query failed", error);
-      return NextResponse.json({ error: "Could not load recent spending" }, { status: 500 });
-    }
-
-    const volatility = computeVolatility(
-      (transactions ?? []).map((row) => ({
-        amountCents: row.amount_cents,
-        date: row.date,
-        isTransfer: row.is_transfer,
-      })),
-      windowStart,
-      plan.today,
-      plan.bufferFloorCents,
-    );
-
-    const check = await runRealityCheck(plan, volatility);
-
-    // Only ever an update. The row is created by the engine, and these columns
-    // are service-role-only, so this is the single path that writes them.
-    const { error: updateError } = await db
-      .from("debt_strikes")
-      .update({
-        ai_adjusted_amount_cents: check.adjustedStrikeCents,
-        ai_rationale: check.rationale,
-      })
-      .eq("user_id", userId)
-      .eq("week_start", plan.weekStart);
-
-    if (updateError) {
-      console.error("Failed to persist reality check", updateError);
-      return NextResponse.json({ error: "Could not save the advice" }, { status: 500 });
-    }
+    const { check, volatility } = outcome;
 
     return NextResponse.json({
       adjusted_strike_cents: check.adjustedStrikeCents,
