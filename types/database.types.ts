@@ -110,6 +110,8 @@ export type Database = {
           engine_version: number;
           next_payday: string | null;
           shortfall_cents: number;
+          ai_adjusted_amount_cents: number | null;
+          ai_rationale: string | null;
         };
         Insert: {
           id?: string;
@@ -132,6 +134,8 @@ export type Database = {
           engine_version?: number;
           next_payday?: string | null;
           shortfall_cents?: number;
+          ai_adjusted_amount_cents?: number | null;
+          ai_rationale?: string | null;
         };
         Update: {
           id?: string;
@@ -154,6 +158,8 @@ export type Database = {
           engine_version?: number;
           next_payday?: string | null;
           shortfall_cents?: number;
+          ai_adjusted_amount_cents?: number | null;
+          ai_rationale?: string | null;
         };
           Relationships: [
             {
