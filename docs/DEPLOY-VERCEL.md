@@ -39,9 +39,14 @@ Apply the schema from your machine:
 ```bash
 npx supabase login
 npx supabase link --project-ref <your-project-ref>
-npm run db:push        # migrations 0001–0004
+npm run db:push        # applies every migration
 npm run db:types       # regenerate types from your own database
 ```
+
+`db:push` and `db:types` both fail with "Cannot find project ref" until `link`
+has run — the ref is the subdomain of your project URL, so
+`https://abcdefgh.supabase.co` means `--project-ref abcdefgh`. Linking prompts
+for the database password from step 2.
 
 Confirm eight tables exist in the Table Editor: `users`, `plaid_items`,
 `accounts`, `debts`, `expenses`, `transactions`, `debt_strikes`,

@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --linked --schema public > types/database.types.ts"
+    "db:types": "supabase gen types typescript --linked --schema public > types/database.types.ts.tmp && mv types/database.types.ts.tmp types/database.types.ts || (rm -f types/database.types.ts.tmp && exit 1)"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.57",
