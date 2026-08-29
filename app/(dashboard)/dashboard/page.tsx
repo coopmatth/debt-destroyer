@@ -31,7 +31,7 @@ export default async function DashboardPage() {
   const [{ data: strike }, { data: debts }, { data: expenses }] = await Promise.all([
     db
       .from("debt_strikes")
-      .select("id, status")
+      .select("id, status, ai_adjusted_amount_cents, ai_rationale")
       .eq("user_id", userId)
       .eq("week_start", plan.weekStart)
       .maybeSingle(),
@@ -45,6 +45,14 @@ export default async function DashboardPage() {
         plan={plan}
         strikeId={strike?.id ?? null}
         status={strike?.status ?? null}
+        advice={
+          strike?.ai_adjusted_amount_cents != null
+            ? {
+                adjustedAmountCents: strike.ai_adjusted_amount_cents,
+                rationale: strike.ai_rationale,
+              }
+            : null
+        }
       />
 
       <CalendarView

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient, getAuthenticatedUserId } from "@/lib/supabase/server";
 import { BudgetForm } from "@/components/settings/BudgetForm";
 import { LinkedBanks } from "@/components/settings/LinkedBanks";
+import { BillDiscoveryList } from "@/components/settings/BillDiscoveryList";
 import { StrategyToggle } from "@/components/settings/StrategyToggle";
 import { Card, CardTitle } from "@/components/ui";
 
@@ -60,6 +61,8 @@ export default async function SettingsPage() {
       <BudgetForm settings={profile} />
 
       <LinkedBanks items={items ?? []} accounts={accounts ?? []} />
+
+      <BillDiscoveryList />
     </div>
   );
 }

@@ -9,10 +9,16 @@
   --surface-2: #1f2937;
   --surface-3: #374151;
 
-  /* High contrast text */
+  /* High contrast text.
+     Each step is one slate stop lighter than the obvious choice, because the
+     obvious choice failed. #475569 as muted measured 2.34:1 on the card
+     surface and 1.94:1 on raised — under half the 4.5:1 needed for body text,
+     and muted carries the small print: dates, hints, ledger detail. Shifting
+     both steps together keeps the original hierarchy exactly (secondary stays
+     visibly brighter than muted) while clearing 5.7:1 at the worst case. */
   --ink-primary: #f8fafc;
-  --ink-secondary: #94a3b8;
-  --ink-muted: #475569;
+  --ink-secondary: #cbd5e1;
+  --ink-muted: #94a3b8;
   --hairline: rgba(255, 255, 255, 0.08);
 
   /* Vibrant Neon Series Colors */
