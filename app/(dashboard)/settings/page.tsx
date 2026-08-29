@@ -4,6 +4,7 @@ import { BudgetForm } from "@/components/settings/BudgetForm";
 import { LinkedBanks } from "@/components/settings/LinkedBanks";
 import { BillDiscoveryList } from "@/components/settings/BillDiscoveryList";
 import { StrategyToggle } from "@/components/settings/StrategyToggle";
+import { ManualRealityCheck } from "@/components/settings/ManualRealityCheck";
 import { Card, CardTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +23,6 @@ export default async function SettingsPage() {
       )
       .eq("id", userId)
       .single(),
-    // Named columns, never `*` — the access-token column is not granted to
-    // client roles, and selecting it errors by design.
     supabase
       .from("plaid_items")
       .select("id, institution_name, status, last_transactions_sync_at")
@@ -53,12 +52,13 @@ export default async function SettingsPage() {
           <span className="font-medium text-ink">Avalanche</span> pays the highest
           APR first — least interest paid overall.{" "}
           <span className="font-medium text-ink">Snowball</span> pays the smallest
-          balance first — accounts clear sooner, which some people need to keep
-          going.
+          balance first.
         </p>
       </Card>
 
       <BudgetForm settings={profile} />
+      
+      <ManualRealityCheck />
 
       <LinkedBanks items={items ?? []} accounts={accounts ?? []} />
 
