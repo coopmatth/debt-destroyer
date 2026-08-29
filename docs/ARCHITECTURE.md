@@ -25,6 +25,9 @@ debt-destroyer/
 │       ├── debts/                        Manual debt CRUD (RLS-scoped)     [Phase 2]
 │       ├── expenses/                     Manual bill CRUD (RLS-scoped)     [Phase 2]
 │       ├── settings/                      PATCH the engine's knobs          [Phase 4]
+│       ├── ai/
+│       │   ├── discover-bills/            POST → recurring bills to approve
+│       │   └── reality-check/             POST → a lower, safer strike
 │       ├── engine/
 │       │   └── weekly-plan/             GET compute · POST persist        [Phase 3]
 │       ├── strikes/[id]/                PATCH accept/skip/paid            [Phase 3]
@@ -32,6 +35,8 @@ debt-destroyer/
 │           └── weekly-refresh/          Vercel Cron: sync all, recompute  [Phase 3]
 ├── lib/
 │   ├── plaid/         client.ts, link.ts, accounts.ts, transactions.ts, mappers.ts  [Phase 2]
+│   ├── ai/            client.ts (Gemini) · recurring.ts · volatility.ts
+│   │                  discover-bills.ts · reality-check.ts
 │   ├── validation/    debts.ts, expenses.ts — zod schemas shared by API and forms
 │   ├── money.ts       cents ↔ dollars, currency formatting
 │   ├── supabase/      client.ts (browser), server.ts (RSC/route), admin.ts (service role)
@@ -276,3 +281,49 @@ the page and the route to disagree about the week's number.
 **Verified by rendering.** The dashboard was built with fixture data and
 screenshotted at 1280px light, 1280px dark, and 390px mobile: no horizontal
 overflow, no label collisions, and dark mode re-stepped rather than flipped.
+
+## The AI advisory layer
+
+Optional throughout. With no `GOOGLE_GENERATIVE_AI_API_KEY` the routes return
+503 and the rest of the app is unchanged — the deterministic engine decides
+everything that matters, and the advisor is garnish on top of maths that works
+without it.
+
+**Arithmetic here, judgment there.** `recurring.ts` and `volatility.ts` compute
+every figure: merchant grouping, median amounts, intervals, cadence, next due
+dates, standard deviation, coefficient of variation, how many days of typical
+spending the cash floor covers. The model is asked only the questions a
+calculation cannot answer — is this repetition an obligation or a habit, and
+how much caution does this week deserve. It never emits money. A hallucinated
+$180 where the real charge is $18 would become a reserved bill and quietly
+distort every recommendation until someone noticed.
+
+**The advisor can only reduce.** `applyHoldback` takes the model's judgment as
+a percentage and does the multiplication, holding two invariants regardless of
+what comes back: the result never exceeds the deterministic strike, and rounding
+is always downward so it cannot creep back over the ceiling. A model returning
+999 or -50 cannot produce an unsafe number.
+
+**Stale advice is inert.** The dashboard prefers the AI figure only when it is
+lower. Advice computed on Monday against a larger surplus is simply ignored on
+Wednesday rather than acted on, which is also why no cross-column CHECK enforces
+the relationship in the database — see migration 0005.
+
+**Both plans are recomputed server-side.** Neither AI route accepts a WeeklyPlan
+from the request body. Both write to `debt_strikes`, and a plan supplied by the
+caller is a number the caller chose — accepting one would reopen the forgery
+path migration 0005 closed.
+
+**Model selection auto-updates.** `gemini-flash-latest` tracks the current Flash
+release without a redeploy; `withModelFallback` retries once on a pinned
+`gemini-2.5-flash` if the alias resolves somewhere the API key cannot reach, so
+an upstream release cannot take the feature down. Free-tier quota is not
+exposed by any API, so "newest" is the closest discoverable proxy for "most
+generous" — set `GEMINI_MODEL` to pin a specific id when that trade is wrong.
+
+**The weekly cron runs the advisor last, on a clock.** Syncing balances and
+recomputing the strike is what the app needs to be correct; the advisory pass is
+a nicety. Past a 40s budget the run stops starting AI calls, so a slow model
+costs the nicety and never the necessity. An advisory failure is caught per
+user and never fails the run — the deterministic strike is already stored, and
+the dashboard shows it unadjusted.
