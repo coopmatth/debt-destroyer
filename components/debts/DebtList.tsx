@@ -19,7 +19,7 @@ export function DebtList({ debts, today }: { debts: Debt[]; today: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid gap-4 md:grid-cols-2 items-start">
       {debts.map((debt) => (
         <DebtRow key={debt.id} debt={debt} today={today} />
       ))}
@@ -57,7 +57,7 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
   }
 
   return (
-    <Card className="p-4 sm:p-4">
+    <Card className="p-4 sm:p-4 h-full">
       {editing ? (
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
@@ -136,32 +136,34 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
           </div>
         </div>
       ) : (
-        <>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
-            <div>
-              <span className="font-medium text-ink">{debt.name}</span>
-              <span className="tabular ml-2 text-sm text-ink-muted">
-                {formatApr(debt.apr)} APR
-              </span>
+        <div className="flex flex-col h-full justify-between">
+          <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
+              <div>
+                <span className="font-medium text-ink">{debt.name}</span>
+                <span className="tabular ml-2 text-sm text-ink-muted">
+                  {formatApr(debt.apr)} APR
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {minimumMet ? <Badge tone="good">✓ Minimum paid</Badge> : null}
+                {overdue ? <Badge tone="critical">▲ Minimum overdue</Badge> : null}
+                <span className="tabular font-semibold text-ink">
+                  {formatCents(debt.current_balance_cents)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {minimumMet ? <Badge tone="good">✓ Minimum paid</Badge> : null}
-              {overdue ? <Badge tone="critical">▲ Minimum overdue</Badge> : null}
-              <span className="tabular font-semibold text-ink">
-                {formatCents(debt.current_balance_cents)}
-              </span>
-            </div>
+            <p className="mt-1 text-xs text-ink-muted tabular">
+              Minimum {formatCents(debt.minimum_payment_cents)}
+              {debt.next_due_date
+                ? ` · due ${formatDueDate(debt.next_due_date, today)} (${formatRelativeDays(debt.next_due_date, today)})`
+                : " · no due date set"}
+            </p>
           </div>
 
-          <p className="mt-1 text-xs text-ink-muted tabular">
-            Minimum {formatCents(debt.minimum_payment_cents)}
-            {debt.next_due_date
-              ? ` · due ${formatDueDate(debt.next_due_date, today)} (${formatRelativeDays(debt.next_due_date, today)})`
-              : " · no due date set"}
-          </p>
-
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-hairline">
             <Button size="sm" onClick={() => setEditing(true)}>
               Edit details
             </Button>
@@ -190,7 +192,7 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
               Remove
             </Button>
           </div>
-        </>
+        </div>
       )}
     </Card>
   );
