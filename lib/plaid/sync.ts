@@ -9,6 +9,7 @@ import {
 } from "@/lib/plaid/items";
 import { syncBalances } from "@/lib/plaid/accounts";
 import { syncTransactions } from "@/lib/plaid/transactions";
+import { syncLiabilities } from "@/lib/plaid/liabilities";
 
 export interface ItemSyncReport {
   itemId: string;
