@@ -32,11 +32,28 @@ export function LinkedBanks({
 }) {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function sync() {
     setSyncing(true);
     await fetch("/api/plaid/sync", { method: "POST" });
     setSyncing(false);
+    router.refresh();
+  }
+
+  async function disconnectItem(id: string) {
+    if (!confirm("Are you sure? This permanently removes the bank connection and deletes all its synced accounts, debts, and transactions.")) return;
+    setBusyId(id);
+    await fetch(`/api/plaid/items/${id}`, { method: "DELETE" });
+    setBusyId(null);
+    router.refresh();
+  }
+
+  async function hideAccount(id: string) {
+    if (!confirm("Hide this account? It will be removed from your dashboard and cash flow calculations.")) return;
+    setBusyId(id);
+    await fetch(`/api/accounts/${id}`, { method: "DELETE" });
+    setBusyId(null);
     router.refresh();
   }
 
@@ -55,8 +72,7 @@ export function LinkedBanks({
 
       {items.length === 0 ? (
         <EmptyState title="No bank linked">
-          Connect a checking account so the app can see your real balance. Only
-          balances and transactions are read — debts stay hand-entered.
+          Connect a checking account so the app can see your real balance.
         </EmptyState>
       ) : (
         <ul className="mb-4 flex flex-col gap-3">
@@ -79,11 +95,19 @@ export function LinkedBanks({
                   : "Not synced yet"}
               </p>
 
-              {item.status !== "good" ? (
-                <div className="mt-3">
+              <div className="mt-3 flex flex-wrap gap-2">
+                {item.status !== "good" ? (
                   <PlaidLinkButton itemId={item.id} label="Reconnect" />
-                </div>
-              ) : null}
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={busyId === item.id}
+                  onClick={() => disconnectItem(item.id)}
+                >
+                  {busyId === item.id ? "Disconnecting…" : "Disconnect Bank"}
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
@@ -92,21 +116,33 @@ export function LinkedBanks({
       {accounts.length > 0 ? (
         <ul className="mb-4 flex flex-col gap-2 border-t border-hairline pt-4">
           {accounts.map((account) => (
-            <li key={account.id} className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="text-ink">
-                {account.name}
-                {account.mask ? (
-                  <span className="text-ink-muted"> ····{account.mask}</span>
+            <li key={account.id} className="flex items-center justify-between gap-3 text-sm border-b border-hairline/50 pb-2 last:border-0 last:pb-0">
+              <div className="flex flex-col">
+                <span className="text-ink">
+                  {account.name}
+                  {account.mask ? (
+                    <span className="text-ink-muted"> ····{account.mask}</span>
+                  ) : null}
+                </span>
+                {!account.is_liquid ? (
+                  <span className="text-[10px] text-ink-muted">not counted as cash</span>
                 ) : null}
-                {account.is_liquid ? null : (
-                  <span className="ml-2 text-xs text-ink-muted">not counted as cash</span>
-                )}
-              </span>
-              <span className="tabular text-ink">
-                {formatCents(
-                  account.available_balance_cents ?? account.current_balance_cents ?? 0,
-                )}
-              </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="tabular text-ink font-medium">
+                  {formatCents(
+                    account.available_balance_cents ?? account.current_balance_cents ?? 0,
+                  )}
+                </span>
+                <button
+                  title="Remove Account"
+                  disabled={busyId === account.id}
+                  onClick={() => hideAccount(account.id)}
+                  className="text-ink-muted hover:text-critical transition p-1"
+                >
+                  ✕
+                </button>
+              </div>
             </li>
           ))}
         </ul>
