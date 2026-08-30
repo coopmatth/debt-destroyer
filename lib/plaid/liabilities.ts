@@ -19,19 +19,34 @@ export async function syncLiabilities(
     .eq("item_id", item.id);
     
   const accountMap = new Map((accounts ?? []).map((a) => [a.plaid_account_id, a.id]));
+  
+  // Fetch existing debts to prevent overwriting manual fixes with Plaid's zeros
+  const { data: existingDebts } = await db
+    .from("debts")
+    .select("account_id, apr, minimum_payment_cents")
+    .in("account_id", Array.from(accountMap.values()));
+    
+  const existingMap = new Map((existingDebts ?? []).map((d) => [d.account_id, d]));
   const upsertRows = [];
 
   for (const credit of response.data.liabilities.credit ?? []) {
-    // Safety check: ensure Plaid actually returned an account ID before mapping
     if (!credit.account_id) continue;
 
     const accountId = accountMap.get(credit.account_id);
     if (!accountId) continue;
     
+    const existing = existingMap.get(accountId);
     const accountInfo = response.data.accounts.find((a) => a.account_id === credit.account_id);
-    const purchaseApr = credit.aprs?.find((a) => a.apr_type === "purchase_apr")?.apr_percentage 
+    
+    const plaidApr = credit.aprs?.find((a) => a.apr_type === "purchase_apr")?.apr_percentage 
       ?? credit.aprs?.[0]?.apr_percentage 
       ?? 0;
+      
+    const plaidMin = dollarsToCents(credit.minimum_payment_amount) ?? 0;
+
+    // If Plaid sends a 0, retain the user's manual override
+    const finalApr = plaidApr > 0 ? plaidApr : (existing?.apr ?? 0);
+    const finalMin = plaidMin > 0 ? plaidMin : (existing?.minimum_payment_cents ?? 0);
 
     upsertRows.push({
       user_id: item.userId,
@@ -39,9 +54,9 @@ export async function syncLiabilities(
       name: accountInfo?.name ?? "Credit Card",
       kind: "credit_card" as const,
       current_balance_cents: dollarsToCents(accountInfo?.balances.current) ?? 0,
-      apr: purchaseApr,
+      apr: finalApr,
       apr_type: "synced",
-      minimum_payment_cents: dollarsToCents(credit.minimum_payment_amount) ?? 0,
+      minimum_payment_cents: finalMin,
       next_due_date: credit.next_payment_due_date ?? null,
       is_active: true,
     });
