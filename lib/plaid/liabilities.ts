@@ -22,6 +22,9 @@ export async function syncLiabilities(
   const upsertRows = [];
 
   for (const credit of response.data.liabilities.credit ?? []) {
+    // Safety check: ensure Plaid actually returned an account ID before mapping
+    if (!credit.account_id) continue;
+
     const accountId = accountMap.get(credit.account_id);
     if (!accountId) continue;
     
