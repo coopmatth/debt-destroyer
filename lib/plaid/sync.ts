@@ -21,13 +21,6 @@ export interface ItemSyncReport {
   error?: string;
 }
 
-/**
- * Full refresh for one item: balances, then transactions.
- *
- * Failures are captured per item rather than thrown, so one bank with an
- * expired login does not abort the sync for every other connection the user
- * has. The item's status records what went wrong for the UI to act on.
- */
 export async function syncItem(itemId: string): Promise<ItemSyncReport> {
   const db = createAdminClient();
   const report: ItemSyncReport = {
@@ -44,6 +37,12 @@ export async function syncItem(itemId: string): Promise<ItemSyncReport> {
 
     const balances = await syncBalances(db, item);
     report.accountsUpdated = balances.accountsUpdated;
+
+    try {
+      await syncLiabilities(db, item);
+    } catch (e) {
+      // Silently skip if the linked bank connection does not support or have credit products
+    }
 
     const transactions = await syncTransactions(db, item);
     report.transactionsAdded = transactions.added;
@@ -67,8 +66,6 @@ export async function syncAllItemsForUser(userId: string): Promise<ItemSyncRepor
   const db = createAdminClient();
   const itemIds = await listItemIdsForUser(db, userId);
 
-  // Sequential on purpose: institutions rate-limit per item, and a user has a
-  // handful of connections at most.
   const reports: ItemSyncReport[] = [];
   for (const itemId of itemIds) {
     reports.push(await syncItem(itemId));
