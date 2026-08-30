@@ -1,0 +1,25 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export function AutoSync() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Only fire the sync once per browser session
+    if (sessionStorage.getItem("hasSyncedThisSession") === "true") return;
+    sessionStorage.setItem("hasSyncedThisSession", "true");
+
+    fetch("/api/plaid/sync", { method: "POST" })
+      .then((res) => {
+        if (res.ok) {
+          // Silently update the UI with the fresh balances
+          router.refresh();
+        }
+      })
+      .catch((err) => console.error("Auto-sync failed:", err));
+  }, [router]);
+
+  return null;
+}
