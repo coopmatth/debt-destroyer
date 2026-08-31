@@ -5,7 +5,7 @@ import { loadPlanInput } from "@/lib/engine/loader";
 import { DashboardLayoutClient } from "@/components/dashboard/DashboardLayoutClient";
 import { StrikeCard } from "@/components/dashboard/StrikeCard";
 import { CashflowCard } from "@/components/dashboard/CashflowCard";
-import { MonthlyCalendar } from "@/components/dashboard/MonthlyCalendar";
+import { CalendarView } from "@/components/dashboard/CalendarView";
 import type { WeeklyPlan } from "@/lib/engine/types";
 
 export const dynamic = "force-dynamic";
@@ -18,21 +18,22 @@ export default async function DashboardPage() {
   let plan: WeeklyPlan;
 
   try {
-    // Load the raw database rows into the engine's input format first
     const input = await loadPlanInput(supabase, userId);
-    // Then run the synchronous calculation
     plan = computeWeeklyPlan(input);
   } catch (err) {
     redirect("/settings");
   }
 
-  const { data: currentStrike } = await supabase
-    .from("debt_strikes")
-    .select("id, status")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+  // Fetch data required for StrikeCard and CalendarView
+  const [
+    { data: currentStrike },
+    { data: debts },
+    { data: expenses }
+  ] = await Promise.all([
+    supabase.from("debt_strikes").select("id, status").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).single(),
+    supabase.from("debts").select("*").eq("user_id", userId).eq("is_active", true),
+    supabase.from("expenses").select("*").eq("user_id", userId).eq("is_active", true)
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
           />
         }
         cashflowCard={<CashflowCard plan={plan} />}
-        calendar={<MonthlyCalendar plan={plan} />}
+        calendar={<CalendarView plan={plan} debts={debts ?? []} expenses={expenses ?? []} />}
       />
     </div>
   );
