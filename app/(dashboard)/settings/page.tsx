@@ -6,7 +6,6 @@ import { BillDiscoveryList } from "@/components/settings/BillDiscoveryList";
 import { StrategyToggle } from "@/components/settings/StrategyToggle";
 import { ManualRealityCheck } from "@/components/settings/ManualRealityCheck";
 import { ResetSpending } from "@/components/settings/ResetSpending";
-import { AutoMatchBills } from "@/components/settings/AutoMatchBills";
 import { SettingsLayoutClient } from "@/components/settings/SettingsLayoutClient";
 import { Card, CardTitle } from "@/components/ui";
 
@@ -53,7 +52,6 @@ export default async function SettingsPage() {
       </Card>
     ),
     budget: <BudgetForm settings={profile} />,
-    autoMatch: <AutoMatchBills />,
     resetSpending: <ResetSpending />,
     realityCheck: <ManualRealityCheck />,
     linkedBanks: <LinkedBanks items={items ?? []} accounts={accounts ?? []} />,
