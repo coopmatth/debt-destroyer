@@ -2,15 +2,18 @@ import { formatCents } from "@/lib/format";
 import type { WeeklyPlan } from "@/lib/engine/types";
 
 export function MonthlyCalendar({ plan }: { plan: WeeklyPlan }) {
-  const [yearStr, monthStr] = plan.today.split("-");
+  // Ensure we have a string to split even if plan.today is briefly undefined
+  const todayStr = plan.today ?? new Date().toISOString().split("T")[0];
+  const [yearStr, monthStr] = todayStr.split("-");
+  
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
 
-  // Day 0 of the *next* month equals the last day of the current month
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
 
-  const calendarCells = Array.from({ length: firstDayOfWeek }, () => null);
+  // Explicitly type the array so TypeScript knows it can hold strings or nulls
+  const calendarCells: (string | null)[] = Array.from({ length: firstDayOfWeek }, () => null);
   for (let i = 1; i <= daysInMonth; i++) {
     calendarCells.push(`${yearStr}-${monthStr}-${String(i).padStart(2, "0")}`);
   }
@@ -26,9 +29,7 @@ export function MonthlyCalendar({ plan }: { plan: WeeklyPlan }) {
       </div>
 
       <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 text-center text-[10px] font-medium text-ink-muted uppercase">
-        {weekDays.map((d) => (
-          <div key={d}>{d}</div>
-        ))}
+        {weekDays.map((d) => <div key={d}>{d}</div>)}
       </div>
 
       <div className="grid grid-cols-7 gap-1 md:gap-2">
@@ -39,8 +40,8 @@ export function MonthlyCalendar({ plan }: { plan: WeeklyPlan }) {
           const isPayday = day === plan.nextPayday;
           const dayNum = parseInt(day.split("-")[2], 10);
 
-          const billsDue = plan.fixedExpenseCharges.filter((c) => c.dueDate === day);
-          const debtsDue = plan.minimumReservations.filter((m) => m.dueDate === day);
+          const billsDue = plan.fixedExpenseCharges?.filter((c) => c.dueDate === day) ?? [];
+          const debtsDue = plan.minimumReservations?.filter((m) => m.dueDate === day) ?? [];
 
           return (
             <div
@@ -54,20 +55,12 @@ export function MonthlyCalendar({ plan }: { plan: WeeklyPlan }) {
               </span>
 
               <div className="flex flex-col gap-0.5 mt-1 overflow-hidden">
-                {isPayday && (
-                  <span className="rounded bg-good/20 px-1 py-[2px] text-[8px] font-bold text-good truncate">
-                    Payday
-                  </span>
-                )}
+                {isPayday && <span className="rounded bg-good/20 px-1 py-[2px] text-[8px] font-bold text-good truncate">Payday</span>}
                 {debtsDue.map((d, i) => (
-                  <span key={`d-${i}`} className="truncate rounded bg-series-4/20 px-1 py-[2px] text-[8px] font-medium text-series-4 text-left">
-                    {d.name}
-                  </span>
+                  <span key={`d-${i}`} className="truncate rounded bg-series-4/20 px-1 py-[2px] text-[8px] font-medium text-series-4 text-left">{d.name}</span>
                 ))}
                 {billsDue.map((b, i) => (
-                  <span key={`b-${i}`} className="truncate rounded bg-series-2/20 px-1 py-[2px] text-[8px] font-medium text-series-2 text-left">
-                    {b.name}
-                  </span>
+                  <span key={`b-${i}`} className="truncate rounded bg-series-2/20 px-1 py-[2px] text-[8px] font-medium text-series-2 text-left">{b.name}</span>
                 ))}
               </div>
             </div>
