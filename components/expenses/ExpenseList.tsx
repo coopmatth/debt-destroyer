@@ -84,7 +84,6 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
   const [amount, setAmount] = useState((expense.amount_cents / 100).toFixed(2));
   const [dueDate, setDueDate] = useState(expense.next_due_date);
 
-  // Sync local edit state if the server pushes a new date down
   useEffect(() => {
     setName(expense.name);
     setAmount((expense.amount_cents / 100).toFixed(2));
@@ -105,16 +104,12 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
     router.refresh();
   }
 
-  async function handleMarkPaid() {
-    // Advance to the exact next cycle based on frequency (e.g., next month, next week)
+  async function handleSkip() {
     const nextCycleDate = advanceExpensePeriod(expense.next_due_date, expense.frequency as ExpenseFrequency);
-    
     await patch({ 
-      last_paid_date: expense.next_due_date,
-      ...(nextCycleDate ? { next_due_date: nextCycleDate } : {})
+      next_due_date: nextCycleDate,
+      last_paid_date: null // Reset paid status for the new date
     });
-    
-    // Automatically close the expanded row when it flies down to the next month
     setExpanded(false); 
   }
 
@@ -125,13 +120,13 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
         className="flex items-center justify-between p-4 w-full text-left hover:bg-surface-2 transition"
       >
         <div className="flex flex-col">
-          <span className="font-semibold text-ink">{expense.name}</span>
+          <span className={`font-semibold ${paid ? 'text-ink-muted line-through' : 'text-ink'}`}>{expense.name}</span>
           <span className="text-xs text-ink-muted">Due {parseIsoDate(expense.next_due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
         </div>
         <div className="flex items-center gap-3">
-          {paid ? <Badge tone="good">✓</Badge> : null}
+          {paid ? <Badge tone="good">✓ Paid</Badge> : null}
           {overdue ? <Badge tone="critical">!</Badge> : null}
-          <span className="text-lg font-bold tabular text-ink">
+          <span className={`text-lg font-bold tabular ${paid ? 'text-ink-muted' : 'text-ink'}`}>
             {formatCents(expense.amount_cents)}
           </span>
         </div>
@@ -172,38 +167,34 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1.5 pt-2 border-t border-hairline">
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={busy}
-              onClick={() => patch({
-                name: name.trim(),
-                amount_cents: dollarsToCents(Number(amount)) ?? 0,
-                next_due_date: dueDate,
-              })}
-            >
+            <Button size="sm" variant="primary" disabled={busy} onClick={() => patch({
+              name: name.trim(),
+              amount_cents: dollarsToCents(Number(amount)) ?? 0,
+              next_due_date: dueDate,
+            })}>
               Save
             </Button>
+            
             {!paid ? (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={handleMarkPaid}
-              >
+              <Button size="sm" disabled={busy} onClick={() => patch({ last_paid_date: expense.next_due_date })}>
                 Mark Paid
               </Button>
-            ) : null}
-            <Button
-              size="sm"
-              variant="danger"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                await fetch(`/api/expenses/${expense.id}`, { method: "DELETE" });
-                setBusy(false);
-                router.refresh();
-              }}
-            >
+            ) : (
+              <Button size="sm" disabled={busy} onClick={() => patch({ last_paid_date: null })}>
+                Mark Unpaid
+              </Button>
+            )}
+
+            <Button size="sm" variant="ghost" disabled={busy} onClick={handleSkip}>
+              Skip Cycle
+            </Button>
+
+            <Button size="sm" variant="danger" disabled={busy} onClick={async () => {
+              setBusy(true);
+              await fetch(`/api/expenses/${expense.id}`, { method: "DELETE" });
+              setBusy(false);
+              router.refresh();
+            }}>
               Remove
             </Button>
           </div>
