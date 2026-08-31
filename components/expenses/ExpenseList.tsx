@@ -1,18 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
-import { formatCents, formatDueDate, titleCase } from "@/lib/format";
+import { formatCents } from "@/lib/format";
 import { dollarsToCents } from "@/lib/money";
+import { parseIsoDate, advanceExpensePeriod, type ExpenseFrequency } from "@/lib/engine/dates";
 import type { Tables } from "@/types/database.types";
-// Import your existing AddExpenseForm component here
 import { AddExpenseForm } from "@/components/expenses/AddExpenseForm";
 
 type Expense = Tables<"expenses">;
 
 export function ExpenseList({ expenses, today }: { expenses: Expense[]; today: string }) {
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Sort bills chronologically
+  const sortedExpenses = [...expenses].sort((a, b) => a.next_due_date.localeCompare(b.next_due_date));
+
+  // Group bills by month and year
+  const grouped = sortedExpenses.reduce((acc, expense) => {
+    const dateObj = parseIsoDate(expense.next_due_date);
+    const monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    if (!acc[monthYear]) acc[monthYear] = [];
+    acc[monthYear].push(expense);
+    return acc;
+  }, {} as Record<string, Expense[]>);
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,9 +58,16 @@ export function ExpenseList({ expenses, today }: { expenses: Expense[]; today: s
           Add the recurring costs due before your next payday.
         </EmptyState>
       ) : (
-        <div className="flex flex-col gap-2">
-          {expenses.map((expense) => (
-            <ExpenseRow key={expense.id} expense={expense} today={today} />
+        <div className="flex flex-col gap-6">
+          {Object.entries(grouped).map(([month, monthExpenses]) => (
+            <div key={month} className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold tracking-wide text-ink-secondary uppercase ml-1">
+                {month}
+              </h3>
+              {monthExpenses.map((expense) => (
+                <ExpenseRow key={expense.id} expense={expense} today={today} />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -65,6 +84,13 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
   const [amount, setAmount] = useState((expense.amount_cents / 100).toFixed(2));
   const [dueDate, setDueDate] = useState(expense.next_due_date);
 
+  // Sync local edit state if the server pushes a new date down
+  useEffect(() => {
+    setName(expense.name);
+    setAmount((expense.amount_cents / 100).toFixed(2));
+    setDueDate(expense.next_due_date);
+  }, [expense]);
+
   const paid = expense.last_paid_date !== null && expense.last_paid_date >= expense.next_due_date;
   const overdue = !paid && expense.next_due_date < today;
 
@@ -79,13 +105,29 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
     router.refresh();
   }
 
+  async function handleMarkPaid() {
+    // Advance to the exact next cycle based on frequency (e.g., next month, next week)
+    const nextCycleDate = advanceExpensePeriod(expense.next_due_date, expense.frequency as ExpenseFrequency);
+    
+    await patch({ 
+      last_paid_date: expense.next_due_date,
+      ...(nextCycleDate ? { next_due_date: nextCycleDate } : {})
+    });
+    
+    // Automatically close the expanded row when it flies down to the next month
+    setExpanded(false); 
+  }
+
   return (
     <Card className="flex flex-col p-0 overflow-hidden">
       <button 
         onClick={() => setExpanded(!expanded)}
         className="flex items-center justify-between p-4 w-full text-left hover:bg-surface-2 transition"
       >
-        <span className="font-semibold text-ink">{expense.name}</span>
+        <div className="flex flex-col">
+          <span className="font-semibold text-ink">{expense.name}</span>
+          <span className="text-xs text-ink-muted">Due {parseIsoDate(expense.next_due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
+        </div>
         <div className="flex items-center gap-3">
           {paid ? <Badge tone="good">✓</Badge> : null}
           {overdue ? <Badge tone="critical">!</Badge> : null}
@@ -146,7 +188,7 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
               <Button
                 size="sm"
                 disabled={busy}
-                onClick={() => patch({ last_paid_date: expense.next_due_date })}
+                onClick={handleMarkPaid}
               >
                 Mark Paid
               </Button>
