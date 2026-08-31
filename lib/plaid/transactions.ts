@@ -5,6 +5,7 @@ import { withRetry, toPlaidError } from "@/lib/plaid/errors";
 import type { AdminClient } from "@/lib/supabase/admin";
 import type { LinkedItem } from "@/lib/plaid/items";
 import { mapAccount, mapTransaction } from "@/lib/plaid/mappers";
+import { autoDetectPayments } from "@/lib/plaid/detection";
 
 export interface TransactionSyncResult {
   added: number;
@@ -142,6 +143,16 @@ export async function syncTransactions(
           .delete()
           .in("plaid_transaction_id", ids.slice(i, i + 500));
         if (error) throw new Error(`Failed to delete transactions: ${error.message}`);
+      }
+    }
+
+    // Process new transactions with Gemini AI to auto-tag bills and debts
+    if (added.length > 0) {
+      try {
+        const plaidTxnIds = added.map((t) => t.transaction_id);
+        await autoDetectPayments(item.userId, plaidTxnIds);
+      } catch (e) {
+        console.error("AI Auto-detection failed", e);
       }
     }
 
