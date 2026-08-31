@@ -29,16 +29,7 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
         className="absolute right-3 top-3 z-10 p-2 cursor-grab text-ink-muted hover:text-ink transition select-none touch-none bg-surface/80 rounded-md shadow-xs"
         title="Drag to reorder"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="8" y1="6" x2="21" y2="6"></line>
           <line x1="8" y1="12" x2="21" y2="12"></line>
           <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -60,7 +51,6 @@ export function SettingsLayoutClient({
   const defaultOrder = [
     "strategy",
     "budget",
-    "autoMatch",
     "resetSpending",
     "realityCheck",
     "linkedBanks",
@@ -82,8 +72,7 @@ export function SettingsLayoutClient({
     const saved = localStorage.getItem("settingsLayoutOrder");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        // Ensure any newly added settings sections are retained
+        const parsed = JSON.parse(saved).filter((id: string) => id !== "autoMatch");
         const missing = defaultOrder.filter((id) => !parsed.includes(id));
         setOrder([...parsed, ...missing]);
       } catch {
