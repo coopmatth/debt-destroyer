@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthenticatedUserId } from "@/lib/supabase/server";
 import { buildWeeklyPlan } from "@/lib/engine";
-import { StrikeCard } from "@/components/dashboard/StrikeCard";
-import { CashflowCard } from "@/components/dashboard/CashflowCard";
-import { MonthlyCalendar } from "@/components/dashboard/MonthlyCalendar";
+import { DashboardLayoutClient } from "@/components/dashboard/DashboardLayoutClient";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +14,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <StrikeCard plan={plan} />
-      <CashflowCard plan={plan} />
-      <MonthlyCalendar plan={plan} />
+      <DashboardLayoutClient plan={plan} />
     </div>
   );
 }
