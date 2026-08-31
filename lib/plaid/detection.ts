@@ -5,17 +5,24 @@ import { isAiConfigured, withModelFallback } from "@/lib/ai/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { advanceExpensePeriod, type ExpenseFrequency, addMonths } from "@/lib/engine/dates";
 
-export async function autoDetectPayments(userId: string, plaidTransactionIds: string[]) {
-  if (plaidTransactionIds.length === 0) return;
-
+export async function autoDetectPayments(userId: string, plaidTransactionIds?: string[]) {
   const db = createAdminClient();
 
-  // Fetch the newly inserted transactions from the database
-  const { data: txns } = await db
-    .from("transactions")
+  let query = db.from("transactions")
     .select("id, plaid_transaction_id, name, merchant_name, amount_cents, date, is_transfer")
-    .in("plaid_transaction_id", plaidTransactionIds)
+    .eq("user_id", userId)
     .eq("is_transfer", false);
+
+  if (plaidTransactionIds && plaidTransactionIds.length > 0) {
+    query = query.in("plaid_transaction_id", plaidTransactionIds);
+  } else {
+    // If no specific IDs provided, scan the last 14 days of un-transferred transactions
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - 14);
+    query = query.gte("date", windowStart.toISOString().slice(0, 10));
+  }
+
+  const { data: txns } = await query;
 
   if (!txns || txns.length === 0) return;
 
@@ -97,7 +104,7 @@ export async function autoDetectPayments(userId: string, plaidTransactionIds: st
           }
         }
       }
-      return; // Exit if AI succeeds so we don't double-run the fallback
+      return; 
     } catch (err) {
       console.error("AI Detection failed, falling back to programmatic logic:", err);
     }
