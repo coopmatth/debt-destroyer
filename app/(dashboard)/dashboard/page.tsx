@@ -12,14 +12,14 @@ export default async function DashboardPage() {
   const userId = await getAuthenticatedUserId();
   if (!userId) redirect("/login");
 
-  // Fix: pass as an object matching WeeklyPlanInput
-  const plan = await computeWeeklyPlan({ userId });
+  // Revert to passing the ID directly
+  const plan = await computeWeeklyPlan(userId);
   if (!plan) redirect("/settings");
 
-  // Fetch the active strike to satisfy the StrikeCard prop requirements
+  // Fix the table name to match your database schema ("debt_strikes")
   const supabase = await createServerSupabaseClient();
   const { data: currentStrike } = await supabase
-    .from("strikes")
+    .from("debt_strikes")
     .select("id, status")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
