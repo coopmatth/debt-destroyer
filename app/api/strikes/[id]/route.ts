@@ -19,12 +19,10 @@ const bodySchema = z.object({
  * Records what the user did with a recommendation.
  *
  * Marking a strike `paid` is the only place the engine writes back to `debts`,
- * and it is what keeps manual tracking from becoming a chore: the balance drops
- * by what was paid and the due date rolls to the next cycle, so the user does
- * not retype numbers every week.
+ * and it is what keeps manual tracking from becoming a chore: the due date 
+ * rolls to the next cycle, so the user does not retype numbers every week.
  *
- * The write is deliberately conservative — it only ever *reduces* a balance,
- * clamped at zero, and only for debts the strike actually targeted.
+ * Balance adjustments are now deferred to Plaid syncs.
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
   const { id } = await params;
@@ -57,7 +55,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (!strike) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (strike.status === "paid") {
-    // Re-applying a payment would decrement the balance twice.
+    // Re-applying a payment would roll the cycle forward twice.
     return NextResponse.json({ error: "This strike is already recorded as paid" }, { status: 409 });
   }
 
@@ -65,8 +63,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   let debtUpdated: string | null = null;
 
   if (status === "paid" && strike.target_debt_id) {
-    const amountPaidCents = parsed.data.amountPaidCents ?? strike.recommended_amount_cents;
-
     const { data: debt, error: debtError } = await db
       .from("debts")
       .select("id, current_balance_cents, next_due_date, min_payment_paid_for_due_date")
@@ -80,8 +76,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     if (debt) {
-      const newBalance = Math.max(0, debt.current_balance_cents - amountPaidCents);
-
       // Paying the strike also satisfies this cycle's minimum on that debt, so
       // roll the cycle forward. Without this the next run would still reserve a
       // minimum the user has already covered.
@@ -90,7 +84,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       const { error: updateError } = await db
         .from("debts")
         .update({
-          current_balance_cents: newBalance,
           ...(debt.next_due_date
             ? {
                 next_due_date: nextDueDate,
