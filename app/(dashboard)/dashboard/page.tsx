@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthenticatedUserId, createServerSupabaseClient } from "@/lib/supabase/server";
-import { computeWeeklyPlan } from "@/lib/engine";
-import { loadPlanInput } from "@/lib/engine/loader";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { computeAndStoreWeeklyPlan } from "@/lib/engine/loader";
 import { DashboardLayoutClient } from "@/components/dashboard/DashboardLayoutClient";
 import { StrikeCard } from "@/components/dashboard/StrikeCard";
 import { CashflowCard } from "@/components/dashboard/CashflowCard";
@@ -14,17 +14,20 @@ export default async function DashboardPage() {
   const userId = await getAuthenticatedUserId();
   if (!userId) redirect("/login");
 
-  const supabase = await createServerSupabaseClient();
+  const adminDb = createAdminClient();
   let plan: WeeklyPlan;
 
   try {
-    const input = await loadPlanInput(supabase, userId);
-    plan = computeWeeklyPlan(input);
+    // computeAndStoreWeeklyPlan calculates the plan and guarantees a row 
+    // exists in the database for the current week.
+    const result = await computeAndStoreWeeklyPlan(adminDb, userId);
+    plan = result.plan;
   } catch (err) {
     redirect("/settings");
   }
 
-  // Fetch data required for StrikeCard and CalendarView, including AI advice fields
+  const supabase = await createServerSupabaseClient();
+
   const [
     { data: currentStrike },
     { data: debts },
@@ -32,20 +35,24 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("debt_strikes")
-      .select("id, status, ai_adjusted_amount_cents, ai_rationale")
+      .select("id, status, recommended_amount_cents, ai_adjusted_amount_cents, ai_rationale, week_start")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single(),
+      .eq("week_start", plan.weekStart)
+      .maybeSingle(),
     supabase.from("debts").select("*").eq("user_id", userId).eq("is_active", true),
     supabase.from("expenses").select("*").eq("user_id", userId).eq("is_active", true)
   ]);
 
-  // Construct the advice object if the reality check has been run
   const advice = currentStrike?.ai_adjusted_amount_cents != null ? {
     adjustedAmountCents: currentStrike.ai_adjusted_amount_cents,
     rationale: currentStrike.ai_rationale,
   } : null;
+
+  // If the strike is already paid, we grab the saved amount so it doesn't vanish to $0
+  const isPaid = currentStrike?.status === "paid";
+  const savedAmountCents = isPaid 
+    ? (currentStrike.ai_adjusted_amount_cents ?? currentStrike.recommended_amount_cents) 
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,6 +63,7 @@ export default async function DashboardPage() {
             strikeId={currentStrike?.id ?? null} 
             status={currentStrike?.status ?? null} 
             advice={advice}
+            savedAmountCents={savedAmountCents}
           />
         }
         cashflowCard={<CashflowCard plan={plan} />}
