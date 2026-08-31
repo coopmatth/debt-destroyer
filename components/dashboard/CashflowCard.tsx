@@ -1,15 +1,17 @@
 import { formatCents } from "@/lib/format";
 import type { WeeklyPlan } from "@/lib/engine/types";
+import { AllocationBar } from "@/components/dashboard/AllocationBar";
 
 export function CashflowCard({ plan }: { plan: WeeklyPlan }) {
-  // Cast to any to bypass strict property checks
-  const p = plan as any;
-  const liquid = p.liquidCashCents ?? 0;
-  const bills = p.fixedExpensesCents ?? 0;
-  const minimums = p.minimumsCents ?? 0;
-  const floor = p.cashFloorCents ?? 0;
-  const safe = p.safeToSpendCents ?? 0;
-  // ... rest of the component remains exactly the same
+  // Use the exact property names from the engine types
+  const liquid = plan.liquidCashCents ?? 0;
+  const bills = plan.fixedExpensesCents ?? 0;
+  const minimums = plan.minimumsReservedCents ?? 0;
+  const floor = plan.bufferFloorCents ?? 0;
+  const safe = plan.safeToSpendCents ?? 0;
+  const variableLeft = plan.variableRemainingCents ?? 0;
+  const variableSpent = plan.variableSpentCents ?? 0;
+  const variableBudget = plan.variableBudgetCents ?? 0;
 
   return (
     <div className="rounded-xl border border-hairline bg-surface p-5 shadow-sm">
@@ -18,6 +20,10 @@ export function CashflowCard({ plan }: { plan: WeeklyPlan }) {
           How this number was reached
         </h2>
         <span className="text-xs text-ink-muted">as of {plan.today}</span>
+      </div>
+
+      <div className="mb-6">
+        <AllocationBar plan={plan} />
       </div>
 
       <div className="flex flex-col gap-3 text-sm">
@@ -37,6 +43,16 @@ export function CashflowCard({ plan }: { plan: WeeklyPlan }) {
           </div>
           <span className="tabular text-ink font-medium">
             - {formatCents(bills)}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center pb-3 border-b border-hairline/50">
+          <div className="flex flex-col">
+            <span className="text-ink">Spending money still to come</span>
+            <span className="text-[10px] text-ink-muted">{formatCents(variableBudget)} budget, {formatCents(variableSpent)} already spent</span>
+          </div>
+          <span className="tabular text-ink font-medium">
+            - {formatCents(variableLeft)}
           </span>
         </div>
 
