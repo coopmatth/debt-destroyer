@@ -2,22 +2,19 @@ import { formatCents } from "@/lib/format";
 import type { WeeklyPlan } from "@/lib/engine/types";
 
 export function MonthlyCalendar({ plan }: { plan: WeeklyPlan }) {
-  const todayStr = plan.today ?? new Date().toISOString().split("T")[0];
-  
-  // Explicitly assert these are strings to satisfy TypeScript
+  const todayStr = plan.today || new Date().toISOString().slice(0, 10);
   const parts = todayStr.split("-");
-  const yearStr = parts[0] as string;
-  const monthStr = parts[1] as string;
   
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
+  // Use fallbacks so TypeScript knows these will never be undefined
+  const year = parseInt(parts[0] ?? "2026", 10);
+  const month = parseInt(parts[1] ?? "1", 10);
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
 
   const calendarCells: (string | null)[] = Array.from({ length: firstDayOfWeek }, () => null);
   for (let i = 1; i <= daysInMonth; i++) {
-    calendarCells.push(`${yearStr}-${monthStr}-${String(i).padStart(2, "0")}`);
+    calendarCells.push(`${parts[0]}-${parts[1]}-${String(i).padStart(2, "0")}`);
   }
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -40,8 +37,9 @@ export function MonthlyCalendar({ plan }: { plan: WeeklyPlan }) {
 
           const isToday = day === plan.today;
           const isPayday = day === plan.nextPayday;
-          // Cast the day portion to string before parsing
-          const dayNum = parseInt(day.split("-")[2] as string, 10);
+          
+          const dayParts = day.split("-");
+          const dayNum = parseInt(dayParts[2] ?? "1", 10);
 
           const billsDue = plan.fixedExpenseCharges?.filter((c) => c.dueDate === day) ?? [];
           const debtsDue = plan.minimumReservations?.filter((m) => m.dueDate === day) ?? [];
