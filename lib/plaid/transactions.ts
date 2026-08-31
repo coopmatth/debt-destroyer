@@ -5,7 +5,6 @@ import { withRetry, toPlaidError } from "@/lib/plaid/errors";
 import type { AdminClient } from "@/lib/supabase/admin";
 import type { LinkedItem } from "@/lib/plaid/items";
 import { mapAccount, mapTransaction } from "@/lib/plaid/mappers";
-import { autoDetectPayments } from "@/lib/plaid/detection";
 
 export interface TransactionSyncResult {
   added: number;
@@ -15,24 +14,9 @@ export interface TransactionSyncResult {
   restarted: boolean;
 }
 
-const MAX_PAGES = 50; // ~25k transactions; a guard against an infinite has_more loop
+const MAX_PAGES = 50; 
 const PAGE_SIZE = 500;
 
-/**
- * Incremental transaction sync via /transactions/sync.
- *
- * Two details that bite in production:
- *
- * 1. If the item's data changes mid-pagination, Plaid returns
- *    TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION and every page fetched so far
- *    is invalid. The only correct response is to discard the accumulated batch
- *    and restart from the cursor we began with — which is why the cursor is
- *    only written back to the database after the whole loop succeeds.
- *
- * 2. The cursor must not advance unless the rows actually landed. Persisting a
- *    cursor before the write means a failed insert silently skips those
- *    transactions forever, and nothing ever tells you.
- */
 export async function syncTransactions(
   db: AdminClient,
   item: LinkedItem,
@@ -43,7 +27,6 @@ export async function syncTransactions(
   let attempt = 0;
   let restarted = false;
 
-  // Outer loop exists solely to handle the mutation-during-pagination restart.
   while (attempt < 3) {
     attempt++;
 
@@ -94,9 +77,8 @@ export async function syncTransactions(
       hasMore = page.data.has_more;
     }
 
-    if (mutated) continue; // discard everything and start over from startingCursor
+    if (mutated) continue;
 
-    // Accounts first: transactions carry a foreign key to them.
     if (accountsSeen.size > 0) {
       const { error } = await db
         .from("accounts")
@@ -117,16 +99,12 @@ export async function syncTransactions(
     const toRows = (transactions: Transaction[]) =>
       transactions.flatMap((transaction) => {
         const accountId = uuidByPlaidId.get(transaction.account_id);
-        // An account we have never seen (e.g. newly added and not yet returned
-        // by accounts_get) — skip rather than violate the foreign key.
         if (!accountId) return [];
         return [mapTransaction(transaction, { userId: item.userId, accountId })];
       });
 
     const upsertRows = [...toRows(added), ...toRows(modified)];
 
-    // Chunked: PostgREST payloads have practical size limits, and a first sync
-    // can return thousands of rows.
     for (let i = 0; i < upsertRows.length; i += 500) {
       const chunk = upsertRows.slice(i, i + 500);
       const { error } = await db
@@ -146,17 +124,6 @@ export async function syncTransactions(
       }
     }
 
-    // Process new transactions with Gemini AI to auto-tag bills and debts
-    if (added.length > 0) {
-      try {
-        const plaidTxnIds = added.map((t) => t.transaction_id);
-        await autoDetectPayments(item.userId, plaidTxnIds);
-      } catch (e) {
-        console.error("AI Auto-detection failed", e);
-      }
-    }
-
-    // Only now is it safe to advance the cursor.
     const { error: cursorError } = await db
       .from("plaid_items")
       .update({
@@ -175,7 +142,5 @@ export async function syncTransactions(
     };
   }
 
-  throw new Error(
-    `transactions_sync for item ${item.id} kept mutating during pagination after 3 attempts`,
-  );
+  throw new Error(`transactions_sync kept mutating during pagination`);
 }
