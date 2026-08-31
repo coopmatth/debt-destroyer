@@ -5,7 +5,8 @@ import { LinkedBanks } from "@/components/settings/LinkedBanks";
 import { BillDiscoveryList } from "@/components/settings/BillDiscoveryList";
 import { StrategyToggle } from "@/components/settings/StrategyToggle";
 import { ManualRealityCheck } from "@/components/settings/ManualRealityCheck";
-import { ResetSpending } from "@/components/settings/ResetSpending"; // <-- New import
+import { ResetSpending } from "@/components/settings/ResetSpending";
+import { AutoMatchBills } from "@/components/settings/AutoMatchBills";
 import { Card, CardTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,8 @@ export default async function SettingsPage() {
 
       <BudgetForm settings={profile} />
       
-      <ResetSpending /> {/* <-- Added here */}
+      <AutoMatchBills />
+      <ResetSpending /> 
       
       <ManualRealityCheck />
 
