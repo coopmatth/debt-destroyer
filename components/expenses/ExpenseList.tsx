@@ -14,10 +14,8 @@ type Expense = Tables<"expenses">;
 export function ExpenseList({ expenses, today }: { expenses: Expense[]; today: string }) {
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Sort bills chronologically
   const sortedExpenses = [...expenses].sort((a, b) => a.next_due_date.localeCompare(b.next_due_date));
 
-  // Group bills by month and year
   const grouped = sortedExpenses.reduce((acc, expense) => {
     const dateObj = parseIsoDate(expense.next_due_date);
     const monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -104,11 +102,20 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
     router.refresh();
   }
 
+  async function handleMarkPaid() {
+    const nextCycleDate = advanceExpensePeriod(expense.next_due_date, expense.frequency as ExpenseFrequency);
+    await patch({ 
+      last_paid_date: expense.next_due_date,
+      ...(nextCycleDate ? { next_due_date: nextCycleDate } : {})
+    });
+    setExpanded(false); 
+  }
+
   async function handleSkip() {
     const nextCycleDate = advanceExpensePeriod(expense.next_due_date, expense.frequency as ExpenseFrequency);
     await patch({ 
       next_due_date: nextCycleDate,
-      last_paid_date: null // Reset paid status for the new date
+      last_paid_date: null 
     });
     setExpanded(false); 
   }
@@ -176,7 +183,7 @@ function ExpenseRow({ expense, today }: { expense: Expense; today: string }) {
             </Button>
             
             {!paid ? (
-              <Button size="sm" disabled={busy} onClick={() => patch({ last_paid_date: expense.next_due_date })}>
+              <Button size="sm" disabled={busy} onClick={handleMarkPaid}>
                 Mark Paid
               </Button>
             ) : (
