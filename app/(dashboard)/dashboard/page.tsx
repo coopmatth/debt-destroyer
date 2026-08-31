@@ -24,16 +24,28 @@ export default async function DashboardPage() {
     redirect("/settings");
   }
 
-  // Fetch data required for StrikeCard and CalendarView
+  // Fetch data required for StrikeCard and CalendarView, including AI advice fields
   const [
     { data: currentStrike },
     { data: debts },
     { data: expenses }
   ] = await Promise.all([
-    supabase.from("debt_strikes").select("id, status").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).single(),
+    supabase
+      .from("debt_strikes")
+      .select("id, status, ai_adjusted_amount_cents, ai_rationale")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single(),
     supabase.from("debts").select("*").eq("user_id", userId).eq("is_active", true),
     supabase.from("expenses").select("*").eq("user_id", userId).eq("is_active", true)
   ]);
+
+  // Construct the advice object if the reality check has been run
+  const advice = currentStrike?.ai_adjusted_amount_cents != null ? {
+    adjustedAmountCents: currentStrike.ai_adjusted_amount_cents,
+    rationale: currentStrike.ai_rationale,
+  } : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,6 +55,7 @@ export default async function DashboardPage() {
             plan={plan} 
             strikeId={currentStrike?.id ?? null} 
             status={currentStrike?.status ?? null} 
+            advice={advice}
           />
         }
         cashflowCard={<CashflowCard plan={plan} />}
