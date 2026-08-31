@@ -4,10 +4,6 @@ import { useState, useEffect } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { StrikeCard } from "@/components/dashboard/StrikeCard";
-import { CashflowCard } from "@/components/dashboard/CashflowCard";
-import { MonthlyCalendar } from "@/components/dashboard/MonthlyCalendar";
-import type { WeeklyPlan } from "@/lib/engine/types";
 
 function SortableItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -27,7 +23,15 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
   );
 }
 
-export function DashboardLayoutClient({ plan }: { plan: WeeklyPlan }) {
+export function DashboardLayoutClient({
+  strikeCard,
+  cashflowCard,
+  calendar
+}: {
+  strikeCard: React.ReactNode;
+  cashflowCard: React.ReactNode;
+  calendar: React.ReactNode;
+}) {
   const [order, setOrder] = useState(["strike", "cashflow", "calendar"]);
 
   useEffect(() => {
@@ -49,9 +53,9 @@ export function DashboardLayoutClient({ plan }: { plan: WeeklyPlan }) {
   }
 
   const components: Record<string, React.ReactNode> = {
-    strike: <StrikeCard plan={plan} />,
-    cashflow: <CashflowCard plan={plan} />,
-    calendar: <MonthlyCalendar plan={plan} />,
+    strike: strikeCard,
+    cashflow: cashflowCard,
+    calendar: calendar,
   };
 
   return (
