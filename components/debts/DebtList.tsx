@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
-import { formatApr, formatCents, formatDueDate } from "@/lib/format";
+import { formatCents } from "@/lib/format";
 import { dollarsToCents } from "@/lib/money";
+import { addMonths } from "@/lib/engine/dates";
 import type { Tables } from "@/types/database.types";
-// Import your existing AddDebtForm component here
 import { AddDebtForm } from "@/components/debts/AddDebtForm";
 
 type Debt = Tables<"debts">;
@@ -67,6 +67,14 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
   const [apr, setApr] = useState(debt.apr.toString());
   const [dueDate, setDueDate] = useState(debt.next_due_date ?? "");
 
+  useEffect(() => {
+    setName(debt.name);
+    setBalance((debt.current_balance_cents / 100).toFixed(2));
+    setMinimum((debt.minimum_payment_cents / 100).toFixed(2));
+    setApr(debt.apr.toString());
+    setDueDate(debt.next_due_date ?? "");
+  }, [debt]);
+
   const minimumMet = debt.next_due_date !== null && debt.min_payment_paid_for_due_date === debt.next_due_date;
   const overdue = debt.next_due_date !== null && debt.next_due_date < today && !minimumMet;
 
@@ -81,6 +89,16 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
     router.refresh();
   }
 
+  async function handleSkip() {
+    if (!debt.next_due_date) return;
+    const nextCycleDate = addMonths(debt.next_due_date, 1);
+    await patch({ 
+      next_due_date: nextCycleDate,
+      min_payment_paid_for_due_date: null
+    });
+    setExpanded(false);
+  }
+
   return (
     <Card className="flex flex-col p-0 overflow-hidden">
       <button 
@@ -89,7 +107,7 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
       >
         <span className="font-semibold text-ink">{debt.name}</span>
         <div className="flex items-center gap-3">
-          {minimumMet ? <Badge tone="good">✓</Badge> : null}
+          {minimumMet ? <Badge tone="good">✓ Min Paid</Badge> : null}
           {overdue ? <Badge tone="critical">!</Badge> : null}
           <span className="text-lg font-bold tabular text-ink">
             {formatCents(debt.current_balance_cents)}
@@ -154,40 +172,38 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1.5 pt-2 border-t border-hairline">
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={busy}
-              onClick={() => patch({
-                name: name.trim(),
-                current_balance_cents: dollarsToCents(Number(balance)) ?? 0,
-                minimum_payment_cents: dollarsToCents(Number(minimum)) ?? 0,
-                apr: Number(apr),
-                next_due_date: dueDate || null,
-              })}
-            >
+            <Button size="sm" variant="primary" disabled={busy} onClick={() => patch({
+              name: name.trim(),
+              current_balance_cents: dollarsToCents(Number(balance)) ?? 0,
+              minimum_payment_cents: dollarsToCents(Number(minimum)) ?? 0,
+              apr: Number(apr),
+              next_due_date: dueDate || null,
+            })}>
               Save
             </Button>
+            
             {debt.next_due_date && !minimumMet ? (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() => patch({ min_payment_paid_for_due_date: debt.next_due_date })}
-              >
+              <Button size="sm" disabled={busy} onClick={() => patch({ min_payment_paid_for_due_date: debt.next_due_date })}>
                 Mark Min Paid
               </Button>
+            ) : debt.next_due_date && minimumMet ? (
+              <Button size="sm" disabled={busy} onClick={() => patch({ min_payment_paid_for_due_date: null })}>
+                Mark Unpaid
+              </Button>
             ) : null}
-            <Button
-              size="sm"
-              variant="danger"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                await fetch(`/api/debts/${debt.id}`, { method: "DELETE" });
-                setBusy(false);
-                router.refresh();
-              }}
-            >
+
+            {debt.next_due_date ? (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={handleSkip}>
+                Skip Cycle
+              </Button>
+            ) : null}
+
+            <Button size="sm" variant="danger" disabled={busy} onClick={async () => {
+              setBusy(true);
+              await fetch(`/api/debts/${debt.id}`, { method: "DELETE" });
+              setBusy(false);
+              router.refresh();
+            }}>
               Remove
             </Button>
           </div>
