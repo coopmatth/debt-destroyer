@@ -7,6 +7,7 @@ import { StrategyToggle } from "@/components/settings/StrategyToggle";
 import { ManualRealityCheck } from "@/components/settings/ManualRealityCheck";
 import { ResetSpending } from "@/components/settings/ResetSpending";
 import { AutoMatchBills } from "@/components/settings/AutoMatchBills";
+import { SettingsLayoutClient } from "@/components/settings/SettingsLayoutClient";
 import { Card, CardTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,27 @@ export default async function SettingsPage() {
 
   if (!profile) redirect("/login");
 
+  const sections: Record<string, React.ReactNode> = {
+    strategy: (
+      <Card>
+        <CardTitle hint="changes this week's target">Payoff strategy</CardTitle>
+        <StrategyToggle current={profile.preferred_strategy} />
+        <p className="mt-3 text-sm text-ink-secondary">
+          <span className="font-medium text-ink">Avalanche</span> pays the highest APR
+          first — least interest paid overall.{" "}
+          <span className="font-medium text-ink">Snowball</span> pays the smallest
+          balance first.
+        </p>
+      </Card>
+    ),
+    budget: <BudgetForm settings={profile} />,
+    autoMatch: <AutoMatchBills />,
+    resetSpending: <ResetSpending />,
+    realityCheck: <ManualRealityCheck />,
+    linkedBanks: <LinkedBanks items={items ?? []} accounts={accounts ?? []} />,
+    billDiscovery: <BillDiscoveryList />,
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -47,27 +69,7 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <Card>
-        <CardTitle hint="changes this week's target">Payoff strategy</CardTitle>
-        <StrategyToggle current={profile.preferred_strategy} />
-        <p className="mt-3 text-sm text-ink-secondary">
-          <span className="font-medium text-ink">Avalanche</span> pays the highest
-          APR first — least interest paid overall.{" "}
-          <span className="font-medium text-ink">Snowball</span> pays the smallest
-          balance first.
-        </p>
-      </Card>
-
-      <BudgetForm settings={profile} />
-      
-      <AutoMatchBills />
-      <ResetSpending /> 
-      
-      <ManualRealityCheck />
-
-      <LinkedBanks items={items ?? []} accounts={accounts ?? []} />
-
-      <BillDiscoveryList />
+      <SettingsLayoutClient sections={sections} />
     </div>
   );
 }
