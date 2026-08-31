@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient, getAuthenticatedUserId } from "@/lib/supabase/server";
 import { todayInTimezone } from "@/lib/engine/dates";
-import { DebtForm } from "@/components/debts/DebtForm";
 import { DebtList } from "@/components/debts/DebtList";
 import { StrategyToggle } from "@/components/settings/StrategyToggle";
 
@@ -13,13 +12,8 @@ export default async function DebtsPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  // RLS-scoped: these are the user's own rows, enforced by Postgres.
   const [{ data: debts }, { data: profile }] = await Promise.all([
-    supabase
-      .from("debts")
-      .select("*")
-      .eq("is_active", true)
-      .order("apr", { ascending: false }),
+    supabase.from("debts").select("*").eq("user_id", userId).eq("is_active", true).order("apr", { ascending: false }),
     supabase.from("users").select("preferred_strategy, timezone").eq("id", userId).single(),
   ]);
 
@@ -39,13 +33,6 @@ export default async function DebtsPage() {
       </div>
 
       <DebtList debts={debts ?? []} today={today} />
-
-      <div>
-        <h2 className="mb-3 text-sm font-semibold tracking-wide text-ink-secondary uppercase">
-          Add a debt
-        </h2>
-        <DebtForm />
-      </div>
     </div>
   );
 }
