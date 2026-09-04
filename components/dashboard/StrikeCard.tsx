@@ -25,13 +25,12 @@ export function StrikeCard({
   const hasStrike = plan.recommendedStrikeCents > 0 || isPaid;
 
   const adviceApplies =
-    !isPaid && // Ignore new AI advice if the payment is already locked in
+    !isPaid &&
     hasStrike &&
     advice != null &&
     advice.adjustedAmountCents > 0 &&
     advice.adjustedAmountCents < plan.recommendedStrikeCents;
 
-  // If paid, freeze the hero number to the saved amount. Otherwise, calculate live.
   const headlineCents = isPaid && savedAmountCents != null
     ? savedAmountCents
     : (adviceApplies ? advice.adjustedAmountCents : plan.recommendedStrikeCents);
@@ -67,7 +66,7 @@ export function StrikeCard({
         <div className="mt-6 rounded-lg border border-good/30 bg-good/10 p-4">
           <p className="font-medium text-good">Strike Complete</p>
           <p className="mt-1 text-sm text-good/80">
-            Waiting for your next payday to calculate the next strike.
+            Waiting for Friday morning to calculate next week's strike.
           </p>
         </div>
       ) : (
