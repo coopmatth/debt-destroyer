@@ -2,6 +2,7 @@ import {
   addDays,
   daysBetween,
   nextPaydayOnOrAfter,
+  advancePayPeriod,
   startOfWeekFriday,
   todayInTimezone,
   type IsoDate,
@@ -50,6 +51,11 @@ export function computeWeeklyPlan(
   let nextPayday: IsoDate;
   if (settings.nextPayday) {
     nextPayday = nextPaydayOnOrAfter(settings.nextPayday, settings.payFrequency, today);
+    
+    // Fix: If today is a payday, the cash we are evaluating must last until the *subsequent* payday.
+    if (nextPayday === today) {
+      nextPayday = advancePayPeriod(nextPayday, settings.payFrequency);
+    }
   } else {
     const horizon = DEFAULT_HORIZON_DAYS[settings.payFrequency] ?? 14;
     nextPayday = addDays(today, horizon);
