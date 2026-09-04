@@ -7,7 +7,7 @@ import {
   isIsoDate,
   nextPaydayOnOrAfter,
   occurrencesInWindow,
-  startOfWeekMonday,
+  startOfWeekFriday,
   todayInTimezone,
   withDayOfMonth,
 } from "@/lib/engine/dates";
