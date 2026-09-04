@@ -2,7 +2,7 @@ import {
   addDays,
   daysBetween,
   nextPaydayOnOrAfter,
-  startOfWeekMonday,
+  startOfWeekFriday,
   todayInTimezone,
   type IsoDate,
 } from "@/lib/engine/dates";
@@ -21,10 +21,8 @@ export * from "@/lib/engine/dates";
 export * from "@/lib/engine/cashflow";
 export * from "@/lib/engine/strategy";
 
-/** Bumped when the arithmetic changes, so stored strikes stay interpretable. */
 export const ENGINE_VERSION = 1;
 
-/** Payday horizon assumed when the user has not set one. */
 const DEFAULT_HORIZON_DAYS: Record<string, number> = {
   weekly: 7,
   biweekly: 14,
@@ -33,35 +31,9 @@ const DEFAULT_HORIZON_DAYS: Record<string, number> = {
 };
 
 export interface ComputeOptions {
-  /**
-   * The clock, as an argument. Nothing in the engine calls `new Date()` on its
-   * own — that is what makes "what does this recommend on the 3rd of February"
-   * a test rather than a thought experiment.
-   */
   now?: Date;
 }
 
-/**
- * The Debt Destroyer calculation.
- *
- *   Safe to Spend = Total Liquid Cash
- *                 − Fixed expenses due before the next payday
- *                 − Variable budget not yet spent this week
- *                 − Minimum payments not yet made
- *                 − The user's personal cash floor
- *
- *   Weekly Debt Strike = max(Safe to Spend, 0), rounded down to whole dollars
- *
- * Two additions to the original formula, both load-bearing:
- *
- * Minimums are subtracted before anything is called extra. The spec allows the
- * strike only "provided all minimum payments are met", and reserving the cash
- * is what makes that true rather than hoped for.
- *
- * The floor is subtracted last. It is the cash the user has said never to
- * recommend spending, and an engine that can drive a balance to exactly zero
- * will eventually do it the week before an unexpected bill.
- */
 export function computeWeeklyPlan(
   input: WeeklyPlanInput,
   options: ComputeOptions = {},
@@ -70,12 +42,11 @@ export function computeWeeklyPlan(
   const now = options.now ?? new Date();
 
   const today = todayInTimezone(settings.timezone, now);
-  const weekStart = startOfWeekMonday(today);
+  const weekStart = startOfWeekFriday(today);
 
   const blockers: Blocker[] = [];
   const notes: string[] = [];
 
-  // ---- Horizon -------------------------------------------------------------
   let nextPayday: IsoDate;
   if (settings.nextPayday) {
     nextPayday = nextPaydayOnOrAfter(settings.nextPayday, settings.payFrequency, today);
@@ -88,7 +59,6 @@ export function computeWeeklyPlan(
     });
   }
 
-  // ---- Cash ----------------------------------------------------------------
   const liquid = totalLiquidCash(accounts);
   if (liquid.usedCurrentFallback.length > 0) {
     notes.push(
@@ -102,7 +72,6 @@ export function computeWeeklyPlan(
     });
   }
 
-  // ---- Committed outflows --------------------------------------------------
   const fixed = fixedExpensesDueBefore(expenses, today, nextPayday);
   if (fixed.lapsedExpenses.length > 0) {
     blockers.push({
@@ -115,7 +84,7 @@ export function computeWeeklyPlan(
   const variableLeft = variableRemaining(settings.weeklyVariableBudgetCents, variableSpent);
   if (variableSpent > settings.weeklyVariableBudgetCents) {
     notes.push(
-      `Weekly spending is over budget by ${formatOverage(variableSpent - settings.weeklyVariableBudgetCents)}. That money is already gone, so it reduces the strike rather than the reserve.`,
+      `Weekly spending is over budget by $${((variableSpent - settings.weeklyVariableBudgetCents) / 100).toFixed(2)}. That money is already gone, so it reduces the strike rather than the reserve.`,
     );
   }
 
@@ -127,7 +96,6 @@ export function computeWeeklyPlan(
     });
   }
 
-  // ---- The buffer ----------------------------------------------------------
   const safeToSpendCents =
     liquid.cents -
     fixed.totalCents -
@@ -135,8 +103,6 @@ export function computeWeeklyPlan(
     minimums.totalCents -
     settings.minCashBufferCents;
 
-  // Round down to whole dollars. Never up: rounding up would recommend money
-  // the buffer does not actually cover.
   const recommendedStrikeCents =
     safeToSpendCents > 0 ? Math.floor(safeToSpendCents / 100) * 100 : 0;
 
@@ -144,11 +110,10 @@ export function computeWeeklyPlan(
   if (shortfallCents > 0) {
     blockers.push({
       code: "negative_buffer",
-      message: `Committed costs exceed available cash by ${formatOverage(shortfallCents)} before payday. No strike this week.`,
+      message: `Committed costs exceed available cash by $${(shortfallCents / 100).toFixed(2)} before payday. No strike this week.`,
     });
   }
 
-  // ---- Targeting -----------------------------------------------------------
   const rankedDebts = rankDebts(debts, settings.strategy);
   if (rankedDebts.length === 0) {
     blockers.push({
@@ -167,7 +132,7 @@ export function computeWeeklyPlan(
 
   if (unallocatedCents > 0 && rankedDebts.length > 0) {
     notes.push(
-      `${formatOverage(unallocatedCents)} more is available than the debts can absorb — every balance would be cleared.`,
+      `$${(unallocatedCents / 100).toFixed(2)} more is available than the debts can absorb — every balance would be cleared.`,
     );
   }
 
@@ -193,8 +158,6 @@ export function computeWeeklyPlan(
     bufferFloorCents: settings.minCashBufferCents,
 
     safeToSpendCents,
-    // The strike is what was actually allocated: if the debts cannot absorb the
-    // whole buffer, recommending the larger number would be a lie.
     recommendedStrikeCents: recommendedStrikeCents - unallocatedCents,
     shortfallCents,
 
@@ -205,8 +168,4 @@ export function computeWeeklyPlan(
     blockers,
     notes,
   };
-}
-
-function formatOverage(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
