@@ -2,23 +2,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/types/database.types";
 import { computeWeeklyPlan, type ComputeOptions } from "@/lib/engine";
-import { startOfWeekMonday, todayInTimezone } from "@/lib/engine/dates";
+import { startOfWeekFriday, todayInTimezone } from "@/lib/engine/dates";
 import type { WeeklyPlan, WeeklyPlanInput } from "@/lib/engine/types";
 
 type Client = SupabaseClient<Database>;
-
-/**
- * The impure shell around the pure engine: read rows, map them to plain engine
- * inputs, compute, persist.
- *
- * Everything here is I/O and mapping. No arithmetic — if a number is being
- * decided, it belongs in the engine where it can be tested.
- *
- * Every query filters on user_id explicitly rather than leaning on RLS. The
- * write path has to use the service role (debt_strikes has no client INSERT
- * policy, by design), and under that client RLS is off — an unfiltered read
- * would quietly load every user's accounts into one person's plan.
- */
 
 export async function loadPlanInput(
   db: Client,
@@ -39,7 +26,7 @@ export async function loadPlanInput(
 
   const timezone = user.timezone;
   const today = todayInTimezone(timezone, options.now ?? new Date());
-  const weekStart = startOfWeekMonday(today);
+  const weekStart = startOfWeekFriday(today);
 
   const [accountsResult, debtsResult, expensesResult, transactionsResult] =
     await Promise.all([
@@ -62,7 +49,6 @@ export async function loadPlanInput(
         )
         .eq("user_id", userId)
         .eq("is_active", true),
-      // Only this week's spending is needed; the engine does not filter by date.
       db
         .from("transactions")
         .select("amount_cents, date, is_transfer")
@@ -89,7 +75,6 @@ export async function loadPlanInput(
       name: row.name,
       availableCents: row.available_balance_cents,
       currentCents: row.current_balance_cents,
-      // Generated column; null only if the expression could not be evaluated.
       isLiquid: row.is_liquid ?? false,
     })),
     debts: (debtsResult.data ?? []).map((row) => ({
@@ -119,16 +104,6 @@ export async function loadPlanInput(
   };
 }
 
-/**
- * Computes this week's plan and stores it.
- *
- * Upserting on `(user_id, week_start)` makes a recompute idempotent: running it
- * three times on a Wednesday leaves one row, updated in place, rather than
- * three competing recommendations for the same week.
- *
- * A strike the user has already acted on is not overwritten — once money has
- * moved, the record of what was recommended has to stay put.
- */
 export async function computeAndStoreWeeklyPlan(
   db: Client,
   userId: string,
@@ -155,21 +130,17 @@ export async function computeAndStoreWeeklyPlan(
       strategy: plan.strategy,
       engine_version: plan.engineVersion,
       next_payday: plan.nextPayday,
-
       liquid_cash_cents: plan.liquidCashCents,
       fixed_expenses_cents: plan.fixedExpensesCents,
       variable_expenses_cents: plan.variableRemainingCents,
       minimums_reserved_cents: plan.minimumsReservedCents,
       buffer_floor_cents: plan.bufferFloorCents,
-
       safe_to_spend_cents: plan.safeToSpendCents,
       recommended_amount_cents: plan.recommendedStrikeCents,
       shortfall_cents: plan.shortfallCents,
       target_debt_id: plan.targetDebtId,
       status: "recommended",
       computed_at: new Date().toISOString(),
-
-      // Everything needed to explain the number back to the user later.
       breakdown: asJson({
         engineVersion: plan.engineVersion,
         today: plan.today,
@@ -192,12 +163,6 @@ export async function computeAndStoreWeeklyPlan(
   return { plan, persisted: true };
 }
 
-/**
- * Supabase types a jsonb column as `Json`, which requires an index signature
- * that our named interfaces deliberately do not have. The values here are plain
- * data — arrays, numbers, strings — so the shape is already valid JSON; this
- * just tells the compiler so without stringify/parse round-tripping.
- */
 function asJson<T>(value: T): Json {
   return value as unknown as Json;
 }
