@@ -33,8 +33,6 @@ describe("addMonths", () => {
 
 describe("addDays / daysBetween", () => {
   it("crosses a DST boundary without losing a day", () => {
-    // US DST springs forward on 2026-03-08. Local-time arithmetic here is where
-    // a bill due the 9th silently becomes the 8th.
     expect(addDays("2026-03-07", 1)).toBe("2026-03-08");
     expect(addDays("2026-03-08", 1)).toBe("2026-03-09");
     expect(daysBetween("2026-03-07", "2026-03-09")).toBe(2);
@@ -47,15 +45,16 @@ describe("addDays / daysBetween", () => {
   });
 });
 
-describe("startOfWeekMonday", () => {
-  it("anchors weeks to Monday", () => {
+describe("startOfWeekFriday", () => {
+  it("anchors weeks to Friday", () => {
     // 2026-08-28 is a Friday.
-    expect(startOfWeekMonday("2026-08-28")).toBe("2026-08-24");
-    // Monday maps to itself.
-    expect(startOfWeekMonday("2026-08-24")).toBe("2026-08-24");
-    // Sunday belongs to the week that started six days earlier, not the next one.
-    expect(startOfWeekMonday("2026-08-30")).toBe("2026-08-24");
-    expect(startOfWeekMonday("2026-08-31")).toBe("2026-08-31");
+    expect(startOfWeekFriday("2026-08-28")).toBe("2026-08-28");
+    // Monday belongs to the preceding Friday.
+    expect(startOfWeekFriday("2026-08-24")).toBe("2026-08-21");
+    // Sunday belongs to the Friday that just passed.
+    expect(startOfWeekFriday("2026-08-30")).toBe("2026-08-28");
+    // Thursday belongs to the Friday before it.
+    expect(startOfWeekFriday("2026-09-03")).toBe("2026-08-28");
   });
 });
 
@@ -69,13 +68,13 @@ describe("todayInTimezone", () => {
   });
 
   it("keeps the week boundary in the user's zone", () => {
-    // Sunday 9pm in LA is already Monday in UTC. Using UTC would roll the user
+    // Thursday 9pm in LA is already Friday in UTC. Using UTC would roll the user
     // into a new week — and reset their variable spend — a day early.
-    const sundayEvening = new Date("2026-08-31T04:00:00Z");
-    const laDate = todayInTimezone("America/Los_Angeles", sundayEvening);
-    expect(laDate).toBe("2026-08-30");
-    expect(startOfWeekMonday(laDate)).toBe("2026-08-24");
-    expect(startOfWeekMonday(todayInTimezone("UTC", sundayEvening))).toBe("2026-08-31");
+    const thursdayEvening = new Date("2026-08-28T04:00:00Z");
+    const laDate = todayInTimezone("America/Los_Angeles", thursdayEvening);
+    expect(laDate).toBe("2026-08-27");
+    expect(startOfWeekFriday(laDate)).toBe("2026-08-21");
+    expect(startOfWeekFriday(todayInTimezone("UTC", thursdayEvening))).toBe("2026-08-28");
   });
 });
 
@@ -90,20 +89,15 @@ describe("advancePayPeriod", () => {
   });
 
   it("derives semimonthly dates from the anchor rather than assuming 1st/15th", () => {
-    // Anchored on the 5th => 5th and 20th.
     expect(advancePayPeriod("2026-08-05", "semimonthly")).toBe("2026-08-20");
     expect(advancePayPeriod("2026-08-20", "semimonthly")).toBe("2026-09-05");
-    // Anchored on the 15th => 15th and 30th.
     expect(advancePayPeriod("2026-08-15", "semimonthly")).toBe("2026-08-30");
-    // February clamps.
     expect(advancePayPeriod("2026-02-14", "semimonthly")).toBe("2026-02-28");
   });
 });
 
 describe("nextPaydayOnOrAfter", () => {
   it("projects forward from a stale anchor", () => {
-    // Users set this once and never touch it. Six months later it must still work.
-    // 2026-01-02 + 14×17 days lands exactly on 2026-08-28.
     expect(nextPaydayOnOrAfter("2026-01-02", "biweekly", "2026-08-27")).toBe("2026-08-28");
     expect(nextPaydayOnOrAfter("2026-01-02", "biweekly", "2026-08-29")).toBe("2026-09-11");
     expect(nextPaydayOnOrAfter("2026-01-15", "monthly", "2026-08-28")).toBe("2026-09-15");
@@ -120,7 +114,6 @@ describe("nextPaydayOnOrAfter", () => {
 
 describe("occurrencesInWindow", () => {
   it("returns every occurrence, not just the first", () => {
-    // A weekly bill genuinely lands twice before a fortnightly payday.
     const occurrences = occurrencesInWindow("2026-08-28", "weekly", "2026-08-28", "2026-09-11");
     expect(occurrences).toEqual(["2026-08-28", "2026-09-04", "2026-09-11"]);
   });
@@ -136,7 +129,6 @@ describe("occurrencesInWindow", () => {
   });
 
   it("skips ancient occurrences instead of counting them repeatedly", () => {
-    // A monthly bill anchored a year ago must contribute one charge, not twelve.
     const occurrences = occurrencesInWindow("2025-09-01", "monthly", "2026-08-21", "2026-09-11");
     expect(occurrences).toEqual(["2026-09-01"]);
   });
