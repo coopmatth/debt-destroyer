@@ -1,26 +1,6 @@
-/**
- * Calendar arithmetic for the cash-flow engine.
- *
- * Dates here are `YYYY-MM-DD` strings, not Date objects, and every operation
- * goes through UTC midnight. That is deliberate: bill due dates and paydays are
- * calendar facts, not instants. Doing this math on local Date objects means a
- * bill due "March 9" can silently become March 8 for a user in a timezone that
- * shifts for DST that weekend, and the engine would reserve it a day early —
- * or, worse, a day late.
- */
-
 export type IsoDate = string; // YYYY-MM-DD
-
 export type PayFrequency = "weekly" | "biweekly" | "semimonthly" | "monthly";
-
-export type ExpenseFrequency =
-  | "weekly"
-  | "biweekly"
-  | "semimonthly"
-  | "monthly"
-  | "quarterly"
-  | "annual"
-  | "one_time";
+export type ExpenseFrequency = "weekly" | "biweekly" | "semimonthly" | "monthly" | "quarterly" | "annual" | "one_time";
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -33,7 +13,6 @@ export function isIsoDate(value: string): value is IsoDate {
 export function parseIsoDate(date: IsoDate): Date {
   const match = ISO_DATE.exec(date);
   if (!match) throw new RangeError(`Not a YYYY-MM-DD date: ${date}`);
-
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
@@ -70,7 +49,6 @@ export function addDays(date: IsoDate, days: number): IsoDate {
   return toIsoDate(d);
 }
 
-/** Month arithmetic clamps to the end of the target month: Jan 31 + 1 = Feb 28. */
 export function addMonths(date: IsoDate, months: number): IsoDate {
   const d = parseIsoDate(date);
   const targetIndex = d.getUTCMonth() + months;
@@ -80,7 +58,6 @@ export function addMonths(date: IsoDate, months: number): IsoDate {
   return fromParts(year, month, day);
 }
 
-/** Sets the day of month, clamped to the month's length. */
 export function withDayOfMonth(date: IsoDate, day: number): IsoDate {
   const year = getYear(date);
   const month = getMonth(date);
@@ -108,11 +85,6 @@ export function daysBetween(from: IsoDate, to: IsoDate): number {
   return Math.round(ms / 86_400_000);
 }
 
-/**
- * The user's current calendar date. "Today" has to be resolved in their zone:
- * at 9pm Sunday in Los Angeles it is already Monday in UTC, and computing the
- * week boundary from UTC would roll their week over a day early.
- */
 export function todayInTimezone(timezone: string, now: Date = new Date()): IsoDate {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
@@ -125,24 +97,13 @@ export function todayInTimezone(timezone: string, now: Date = new Date()): IsoDa
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-/** Monday of the week containing `date`. Weeks are Monday–Sunday. */
-export function startOfWeekMonday(date: IsoDate): IsoDate {
+/** Friday of the week containing `date`. Weeks are Friday–Thursday. */
+export function startOfWeekFriday(date: IsoDate): IsoDate {
   const dayOfWeek = parseIsoDate(date).getUTCDay(); // 0 = Sunday
-  const offset = (dayOfWeek + 6) % 7; // Monday => 0, Sunday => 6
+  const offset = (dayOfWeek + 2) % 7; // Friday => 0, Thursday => 6
   return addDays(date, -offset);
 }
 
-// -----------------------------------------------------------------------------
-// Recurrence
-// -----------------------------------------------------------------------------
-
-/**
- * Advances one pay period.
- *
- * Semimonthly deserves a note: it means twice a month, and the two dates are
- * derived from the anchor rather than hardcoded to the 1st and 15th. An anchor
- * on the 5th produces the 5th and the 20th. Clamping keeps February honest.
- */
 export function advancePayPeriod(date: IsoDate, frequency: PayFrequency): IsoDate {
   switch (frequency) {
     case "weekly":
@@ -161,13 +122,6 @@ export function advancePayPeriod(date: IsoDate, frequency: PayFrequency): IsoDat
 
 const MAX_PROJECTION_STEPS = 600;
 
-/**
- * The first payday on or after `from`, projected from the user's anchor date.
- *
- * Users set their next payday once and never touch it again, so by week six the
- * stored value is in the past. Projecting forward from it keeps the engine
- * correct without nagging them to re-enter it.
- */
 export function nextPaydayOnOrAfter(
   anchor: IsoDate,
   frequency: PayFrequency,
@@ -205,20 +159,10 @@ export function advanceExpensePeriod(
     case "annual":
       return addMonths(date, 12);
     case "one_time":
-      return null; // happens once and never again
+      return null;
   }
 }
 
-/**
- * Every occurrence of a recurring bill falling in [windowStart, windowEnd].
- *
- * Returns a list, not a single date, because a weekly bill genuinely lands
- * twice before a fortnightly payday. Treating each expense as "one charge per
- * window" would under-reserve exactly the users living closest to the line.
- *
- * Occurrences before `windowStart` are skipped rather than dragged forward, so
- * a due date left untouched for six months does not get counted six times.
- */
 export function occurrencesInWindow(
   nextDueDate: IsoDate,
   frequency: ExpenseFrequency,
